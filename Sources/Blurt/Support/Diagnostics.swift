@@ -128,10 +128,11 @@ enum Diagnostics {
         // Only meaningful from the menu item, where something else holds focus. From a
         // terminal the focused element is the terminal.
         if canReadPermissions {
-            let kind = TextInjector.focusedFieldKind()
+            let focused = TextInjector.focusedField()
             out += section("focused field", [
-                ("kind", "\(kind)"),
-                ("effect", kind == .singleLine
+                ("kind", "\(focused.kind)"),
+                ("reported", focused.describedAs),
+                ("effect", focused.kind == .singleLine
                     ? "title case, no trailing full stop"
                     : "normal sentence cleanup"),
             ])

@@ -141,11 +141,13 @@ final class DictationController {
         holdStarted = Date()
         // Sampled now, not at injection: this is the moment the user's intent about *where*
         // the text is going is unambiguous.
-        targetField = TextInjector.focusedFieldKind()
-        // Logged every time because it is the answer to "why didn't it title-case that?".
-        // Apps expose wildly different accessibility trees, and a web app reporting
-        // something other than AXTextField is the likeliest reason this feature misses.
-        Log.inject.info("target field: \(String(describing: self.targetField), privacy: .public)")
+        let focused = TextInjector.focusedField()
+        targetField = focused.kind
+        // The raw role is logged, not just the verdict: "unknown" alone cannot be acted on,
+        // and an app reporting an unexpected role is the likeliest way this misses.
+        Log.inject.info(
+            "target field: \(String(describing: focused.kind), privacy: .public) · \(focused.describedAs, privacy: .public)"
+        )
         isComparing = Settings.shared.compareMode
         recorded.removeAll(keepingCapacity: true)
         engineName = isComparing ? "Comparing…" : Settings.shared.engine.displayName

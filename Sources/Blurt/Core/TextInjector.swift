@@ -21,33 +21,82 @@ import Foundation
 /// target app, so "the focused element" is still their text field.
 @MainActor
 enum TextInjector {
-    /// What the focused element is, for the cleanup pass.
+    /// What the focused element is, plus how we decided.
+    ///
+    /// The second half matters: "unknown" on its own is unactionable, and the raw role is
+    /// not observable from outside the process.
+    struct FocusedField {
+        let kind: FieldKind
+        let describedAs: String
+    }
+
+    /// Inspects the focused element.
     ///
     /// Read when the key goes down rather than at injection time, because the field you
     /// were looking at when you started talking is the one you meant — and because cleanup
     /// runs before injection and needs the answer by then.
     ///
-    /// Anything unrecognized is `.unknown`, which means "behave exactly as before". An app
-    /// with a surprising accessibility tree should lose nothing rather than gain surprises.
-    static func focusedFieldKind() -> FieldKind {
+    /// Role first, then height. Web apps, Electron and Java toolkits all expose
+    /// inconsistent accessibility trees, and a Name box in one of them may report something
+    /// other than `AXTextField` — but a control holding one line of text is about one line
+    /// tall whatever it calls itself. Anything still unresolved is `.unknown`, which behaves
+    /// exactly as before: an app with a surprising tree should lose nothing rather than
+    /// gain surprises.
+    static func focusedField() -> FocusedField {
         var focused: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             AXUIElementCreateSystemWide(),
             kAXFocusedUIElementAttribute as CFString,
             &focused
-        ) == .success, let focused else { return .unknown }
-
+        ) == .success, let focused else {
+            return FocusedField(kind: .unknown, describedAs: "no focused element")
+        }
         let element = unsafeDowncast(focused as AnyObject, to: AXUIElement.self)
-        var roleRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element, kAXRoleAttribute as CFString, &roleRef
-        ) == .success, let role = roleRef as? String else { return .unknown }
+
+        func string(_ attribute: String) -> String? {
+            var ref: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, attribute as CFString, &ref) == .success
+            else { return nil }
+            return ref as? String
+        }
+
+        let role = string(kAXRoleAttribute as String) ?? "none"
+        let subrole = string(kAXSubroleAttribute as String) ?? "none"
+        let height = focusedHeight(of: element)
+        let described = "role=\(role) subrole=\(subrole) height=\(Int(height))"
 
         switch role {
-        case kAXTextFieldRole as String: return .singleLine
-        case kAXTextAreaRole as String: return .multiLine
-        default: return .unknown
+        case kAXTextFieldRole as String:
+            return FocusedField(kind: .singleLine, describedAs: described)
+        case kAXTextAreaRole as String:
+            return FocusedField(kind: .multiLine, describedAs: described)
+        default:
+            // A height of zero means the element reported no size, which is not evidence of
+            // anything — so it stays unknown rather than being guessed at as single-line.
+            guard height > 0 else {
+                return FocusedField(kind: .unknown, describedAs: described)
+            }
+            return FocusedField(
+                kind: height <= singleLineHeightLimit ? .singleLine : .multiLine,
+                describedAs: described + " (by height)"
+            )
         }
+    }
+
+    /// Above this, a control is holding more than one line. Standard macOS text fields are
+    /// 21–30pt; web inputs run taller with padding but stay well under this.
+    private static let singleLineHeightLimit: CGFloat = 44
+
+    private static func focusedHeight(of element: AXUIElement) -> CGFloat {
+        var sizeRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element, kAXSizeAttribute as CFString, &sizeRef
+        ) == .success, let sizeRef else { return 0 }
+
+        var size = CGSize.zero
+        let value = unsafeDowncast(sizeRef as AnyObject, to: AXValue.self)
+        guard AXValueGetValue(value, .cgSize, &size) else { return 0 }
+        return size.height
     }
 
     static func insert(_ text: String) {
