@@ -267,9 +267,16 @@ final class DictationController {
                 return
             }
 
+            // Stage timings, logged every dictation. The gap between letting go of the key
+            // and seeing text is the number that matters in this app, and it is not
+            // otherwise observable — the work is spread across an engine finalize, a
+            // cleanup pass and an injection, any of which could be the slow one.
+            let afterEngine = Date()
+
             let cleaned = Settings.shared.cleanupEnabled
                 ? await activeFormatter.format(raw, field: targetField)
                 : raw
+            let afterCleanup = Date()
 
             // The dictionary runs last, and runs regardless of the cleanup setting. Biasing
             // only raises the odds of the right word; this is the pass that guarantees it,
@@ -279,9 +286,28 @@ final class DictationController {
                 Log.speech.info("dictionary · \(corrections.count, privacy: .public) correction(s) applied")
             }
 
-            recordRun(text: output, corrections: corrections)
+            // Inject first. Bookkeeping used to run ahead of this and cost two full reads
+            // of the dictation history plus a complete dashboard re-render — all of it
+            // between the user letting go and the text appearing.
+            let afterDictionary = Date()
             TextInjector.insert(output)
             if Settings.shared.soundEnabled { NSSound(named: "Pop")?.play() }
+            let afterInject = Date()
+
+            if let releasedAt {
+                let ms = { (a: Date, b: Date) in Int(b.timeIntervalSince(a) * 1000) }
+                Log.speech.info(
+                    """
+                    latency \(ms(releasedAt, afterInject), privacy: .public)ms · \
+                    engine \(ms(releasedAt, afterEngine), privacy: .public)ms · \
+                    cleanup \(ms(afterEngine, afterCleanup), privacy: .public)ms · \
+                    dictionary \(ms(afterCleanup, afterDictionary), privacy: .public)ms · \
+                    inject \(ms(afterDictionary, afterInject), privacy: .public)ms
+                    """
+                )
+            }
+
+            recordRun(text: output, corrections: corrections)
 
             state = .idle
             transcript = ""

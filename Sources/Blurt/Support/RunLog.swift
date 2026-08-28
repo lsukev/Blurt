@@ -81,9 +81,15 @@ enum RunLog {
     static var dashboardURL: URL { directory.appendingPathComponent("dashboard.html") }
     private static var runsURL: URL { directory.appendingPathComponent("runs.jsonl") }
 
+    /// Records a run.
+    ///
+    /// Deliberately does *not* regenerate the dashboard. That call read the whole history
+    /// back, rendered every run into HTML and wrote the file — per dictation, and nothing
+    /// in the app opens the result. The HTML dashboard predates the comparison window and
+    /// is now written for no reader; `regenerate()` stays for the launch-time call and for
+    /// anyone opening the file by hand.
     static func record(_ run: DictationRun) {
         append(run)
-        regenerate()
         RunStore.shared.reload()
     }
 
