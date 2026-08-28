@@ -41,8 +41,15 @@ struct SettingsWindow: View {
                             .font(DS.Font.label)
                             .foregroundStyle(DS.Color.inkSecondary)
                         // Tone is a no-op without the model: the rule pass cannot rewrite.
-                        if !settings.smartCleanup || !FoundationModelFormatter.isAvailable {
-                            Text("Tone needs smart cleanup, which is off or unavailable.")
+                        // Say why, specifically — "Apple Intelligence is turned off" is
+                        // actionable, "unavailable" sends someone hunting through Blurt's
+                        // settings for a switch that isn't there.
+                        if let reason = FoundationModelFormatter.unavailableReason {
+                            Text("Tone needs the on-device model. \(reason)")
+                                .font(DS.Font.caption)
+                                .foregroundStyle(DS.Color.inkSecondary)
+                        } else if !settings.smartCleanup {
+                            Text("Tone needs smart cleanup, which is switched off.")
                                 .font(DS.Font.caption)
                                 .foregroundStyle(DS.Color.inkSecondary)
                         }

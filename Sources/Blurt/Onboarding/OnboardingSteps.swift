@@ -431,12 +431,21 @@ struct DoneStep: View {
                         .fixedSize(horizontal: false, vertical: true)
                     // Said plainly rather than left to be noticed: an on-device model is in
                     // the path by default, and it edits what you dictated.
-                    Text("An on-device model tidies each transcript — filler out, "
-                        + "punctuation in, spoken corrections applied. Settings can turn "
-                        + "that off, or let it adjust your tone.")
-                        .font(DS.Font.body)
-                        .foregroundStyle(DS.Color.inkOnDeck.opacity(0.85))
-                        .fixedSize(horizontal: false, vertical: true)
+                    if let reason = FoundationModelFormatter.unavailableReason {
+                        Text("Blurt tidies each transcript with basic rules. \(reason) "
+                            + "Turning it on adds filler removal, spoken corrections, and "
+                            + "tone — Blurt will use it automatically.")
+                            .font(DS.Font.body)
+                            .foregroundStyle(DS.Color.inkOnDeck.opacity(0.85))
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("An on-device model tidies each transcript — filler out, "
+                            + "punctuation in, spoken corrections applied. Settings can turn "
+                            + "that off, or let it adjust your tone.")
+                            .font(DS.Font.body)
+                            .foregroundStyle(DS.Color.inkOnDeck.opacity(0.85))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .frame(maxWidth: 460, alignment: .leading)
                 .padding(DS.Space.roomy)
