@@ -1,3 +1,4 @@
+import BlurtFormatting
 import BlurtDictionary
 import AVFoundation
 import AppKit
@@ -75,6 +76,11 @@ final class DictationController {
     private var recorded: [AudioChunk] = []
     private var isComparing = false
 
+    /// What we are dictating into, sampled when the key goes down. Focus can move while
+    /// someone talks, and cleanup runs before injection anyway — so the answer is taken at
+    /// the moment the user's intent is unambiguous.
+    private var targetField: FieldKind = .unknown
+
     init(
         formatter: (any TextFormatter)? = nil,
         makeEngine: @escaping @Sendable () -> any TranscriptionEngine = engineForCurrentSetting
@@ -133,6 +139,13 @@ final class DictationController {
         state = .starting
         transcript = ""
         holdStarted = Date()
+        // Sampled now, not at injection: this is the moment the user's intent about *where*
+        // the text is going is unambiguous.
+        targetField = TextInjector.focusedFieldKind()
+        // Logged every time because it is the answer to "why didn't it title-case that?".
+        // Apps expose wildly different accessibility trees, and a web app reporting
+        // something other than AXTextField is the likeliest reason this feature misses.
+        Log.inject.info("target field: \(String(describing: self.targetField), privacy: .public)")
         isComparing = Settings.shared.compareMode
         recorded.removeAll(keepingCapacity: true)
         engineName = isComparing ? "Comparing…" : Settings.shared.engine.displayName
@@ -253,7 +266,7 @@ final class DictationController {
             }
 
             let cleaned = Settings.shared.cleanupEnabled
-                ? await activeFormatter.format(raw)
+                ? await activeFormatter.format(raw, field: targetField)
                 : raw
 
             // The dictionary runs last, and runs regardless of the cleanup setting. Biasing

@@ -1,3 +1,4 @@
+import BlurtFormatting
 import AppKit
 import ApplicationServices
 import Foundation
@@ -20,6 +21,35 @@ import Foundation
 /// target app, so "the focused element" is still their text field.
 @MainActor
 enum TextInjector {
+    /// What the focused element is, for the cleanup pass.
+    ///
+    /// Read when the key goes down rather than at injection time, because the field you
+    /// were looking at when you started talking is the one you meant — and because cleanup
+    /// runs before injection and needs the answer by then.
+    ///
+    /// Anything unrecognized is `.unknown`, which means "behave exactly as before". An app
+    /// with a surprising accessibility tree should lose nothing rather than gain surprises.
+    static func focusedFieldKind() -> FieldKind {
+        var focused: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            AXUIElementCreateSystemWide(),
+            kAXFocusedUIElementAttribute as CFString,
+            &focused
+        ) == .success, let focused else { return .unknown }
+
+        let element = unsafeDowncast(focused as AnyObject, to: AXUIElement.self)
+        var roleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element, kAXRoleAttribute as CFString, &roleRef
+        ) == .success, let role = roleRef as? String else { return .unknown }
+
+        switch role {
+        case kAXTextFieldRole as String: return .singleLine
+        case kAXTextAreaRole as String: return .multiLine
+        default: return .unknown
+        }
+    }
+
     static func insert(_ text: String) {
         guard !text.isEmpty else { return }
 

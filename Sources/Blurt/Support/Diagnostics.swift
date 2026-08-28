@@ -124,6 +124,19 @@ enum Diagnostics {
             ("file", DictionaryStore.fileURL.path),
         ])
 
+        // MARK: Target
+        // Only meaningful from the menu item, where something else holds focus. From a
+        // terminal the focused element is the terminal.
+        if canReadPermissions {
+            let kind = TextInjector.focusedFieldKind()
+            out += section("focused field", [
+                ("kind", "\(kind)"),
+                ("effect", kind == .singleLine
+                    ? "title case, no trailing full stop"
+                    : "normal sentence cleanup"),
+            ])
+        }
+
         // MARK: Updates
         out += section("updates", [
             ("feed", Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String ?? "not configured"),

@@ -41,13 +41,13 @@ struct FoundationModelFormatter: TextFormatter {
         }
     }
 
-    func format(_ raw: String) async -> String {
+    func format(_ raw: String, field: FieldKind) async -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return trimmed }
 
         guard Self.isAvailable else {
             Log.speech.info("Foundation model unavailable — using rule-based cleanup")
-            return await fallback.format(trimmed)
+            return await fallback.format(trimmed, field: field)
         }
 
         // Read per call rather than at construction: both can change between dictations,
@@ -58,7 +58,7 @@ struct FoundationModelFormatter: TextFormatter {
 
         do {
             let cleaned = try await withThrowingTaskGroup(of: String.self) { group in
-                group.addTask { try await Self.clean(trimmed, tone: tone, knownTerms: terms) }
+                group.addTask { try await Self.clean(trimmed, tone: tone, knownTerms: terms, field: field) }
                 group.addTask {
                     try await Task.sleep(for: timeout)
                     throw CleanupError.timedOut
@@ -71,12 +71,12 @@ struct FoundationModelFormatter: TextFormatter {
 
             guard Self.isPlausibleCleanup(original: trimmed, cleaned: cleaned) else {
                 Log.speech.info("Foundation model output rejected — using rule-based cleanup")
-                return await fallback.format(trimmed)
+                return await fallback.format(trimmed, field: field)
             }
             return cleaned
         } catch {
             Log.speech.info("Foundation model cleanup failed (\(Self.describe(error), privacy: .public)) — falling back")
-            return await fallback.format(trimmed)
+            return await fallback.format(trimmed, field: field)
         }
     }
 
@@ -106,10 +106,11 @@ struct FoundationModelFormatter: TextFormatter {
     private static func clean(
         _ text: String,
         tone: ToneMode,
-        knownTerms: [String]
+        knownTerms: [String],
+        field: FieldKind
     ) async throws -> String {
         let session = LanguageModelSession(
-            instructions: CleanupInstructions.build(tone: tone, knownTerms: knownTerms)
+            instructions: CleanupInstructions.build(tone: tone, knownTerms: knownTerms, field: field)
         )
 
         let response = try await session.respond(

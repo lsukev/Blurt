@@ -113,3 +113,98 @@ struct RuleCleanupTests {
         #expect(RuleCleanup.apply("   \n  ") == "")
     }
 }
+
+@Suite("Single-line fields")
+struct SingleLineFieldTests {
+
+    // A one-line field holds a label. The reported case: dictating a document title into a
+    // Name box produced "Disaster recovery test report." — sentence case, and a full stop
+    // that came from the speech engine rather than from us, so the earlier fix missed it.
+
+    @Test("the reported case")
+    func documentTitleInANameField() {
+        #expect(RuleCleanup.apply("disaster recovery test report.", field: .singleLine)
+                == "Disaster Recovery Test Report")
+    }
+
+    @Test("a stop the engine supplied is removed, not just one we would have added")
+    func stripsEngineSuppliedStop() {
+        // This is the whole point: cleanup already never appends. Preserving what the engine
+        // sent is right for prose and wrong for a label.
+        #expect(RuleCleanup.apply("Quarterly review.", field: .singleLine) == "Quarterly Review")
+        #expect(RuleCleanup.apply("Quarterly review.", field: .multiLine) == "Quarterly review.")
+    }
+
+    @Test("question and exclamation marks stay")
+    func keepsMeaningfulPunctuation() {
+        // Nobody means a trailing stop in a name box; someone typing a question does.
+        #expect(RuleCleanup.apply("is this right?", field: .singleLine) == "Is This Right?")
+    }
+
+    @Test("minor words stay lowercase, but never first or last")
+    func minorWords() {
+        #expect(RuleCleanup.apply("the state of the union", field: .singleLine)
+                == "The State of the Union")
+        #expect(RuleCleanup.apply("something to look at", field: .singleLine)
+                == "Something to Look At")
+    }
+
+    @Test("deliberate capitalization survives")
+    func preservesInteriorCapitals() {
+        // "PDF" and "iPhone" are spellings, not sentence case to be normalized.
+        #expect(RuleCleanup.apply("export as PDF", field: .singleLine) == "Export as PDF")
+        #expect(RuleCleanup.apply("my iPhone backup", field: .singleLine) == "My iPhone Backup")
+    }
+
+    @Test("addresses and paths are left alone entirely")
+    func doesNotManglIdentifiers() {
+        // The risk accepted when title casing became automatic — bounded here rather than
+        // left to chance.
+        #expect(RuleCleanup.apply("kevin@example.com", field: .singleLine) == "kevin@example.com")
+        #expect(RuleCleanup.apply("reports/2025/q4.pdf", field: .singleLine) == "reports/2025/q4.pdf")
+    }
+
+    @Test("an unknown target behaves exactly as before")
+    func unknownIsUnchanged() {
+        // An app with a surprising accessibility tree must lose nothing, not gain surprises.
+        for text in ["disaster recovery test report.", "what time is it", "yeah"] {
+            #expect(RuleCleanup.apply(text, field: .unknown) == RuleCleanup.apply(text))
+        }
+    }
+
+    @Test("an abbreviation keeps its stop")
+    func abbreviationsKeepTheirStop() {
+        #expect(RuleCleanup.apply("policies for the U.S.", field: .singleLine).hasSuffix("U.S."))
+    }
+}
+
+@Suite("Abbreviations in a single-line field")
+struct AbbreviationTests {
+
+    // Stripping the terminal stop must not amputate an abbreviation. Three separate
+    // detections, because none of them covers the others.
+
+    @Test("an interior period marks an abbreviation")
+    func interiorPeriod() {
+        #expect(RuleCleanup.apply("policies for the U.S.", field: .singleLine) == "Policies for the U.S.")
+        #expect(RuleCleanup.apply("meeting at 9 a.m.", field: .singleLine).hasSuffix("a.m."))
+    }
+
+    @Test("a lone initial keeps its stop")
+    func initials() {
+        #expect(RuleCleanup.apply("notes from Kevin L.", field: .singleLine).hasSuffix("Kevin L."))
+    }
+
+    @Test("known abbreviations keep their stop")
+    func knownAbbreviations() {
+        // Structurally identical to "report." — only a list can tell them apart.
+        #expect(RuleCleanup.apply("budget travel etc.", field: .singleLine).hasSuffix("etc."))
+        #expect(RuleCleanup.apply("invoice for Acme Inc.", field: .singleLine).hasSuffix("Inc."))
+    }
+
+    @Test("an ordinary word still loses its stop")
+    func ordinaryWordsAreStripped() {
+        #expect(RuleCleanup.apply("disaster recovery test report.", field: .singleLine)
+                == "Disaster Recovery Test Report")
+    }
+}

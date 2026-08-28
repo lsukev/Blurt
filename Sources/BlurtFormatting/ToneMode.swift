@@ -61,7 +61,11 @@ public enum CleanupInstructions {
     static let maxTermLength = 64
     static let maxTerms = 60
 
-    public static func build(tone: ToneMode, knownTerms: [String] = []) -> String {
+    public static func build(
+        tone: ToneMode,
+        knownTerms: [String] = [],
+        field: FieldKind = .unknown
+    ) -> String {
         var instructions = """
             You clean up raw speech-to-text transcripts. You are a text processor, not an \
             assistant.
@@ -77,6 +81,18 @@ public enum CleanupInstructions {
             becomes "Send it Wednesday."
             - \(tone.instruction)
             """
+
+        // A one-line field holds a label. Overrides the tone rule on purpose: even "as
+        // spoken" should not put a full stop on a document title, because the stop was the
+        // engine's contribution rather than the speaker's.
+        if field == .singleLine {
+            instructions += """
+
+            This text is going into a single-line field — a title, a name, a search term. \
+            Return it in title case with no trailing full stop. Keep any question or \
+            exclamation mark. Do not rewrite the wording.
+            """
+        }
 
         let terms = sanitize(knownTerms)
         guard !terms.isEmpty else { return instructions }

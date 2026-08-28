@@ -51,6 +51,27 @@ can be requested silently:
 Blurt arms the hotkey the moment Accessibility lands — no restart needed. Then hold
 **Right ⌥** and talk.
 
+### Titles and names
+
+Dictating into a **single-line field** — a Name box, a title, a search bar — is treated as a
+label rather than a sentence: title case, and no trailing full stop.
+
+That last part needs saying because it is not the same fix as "don't add a period". Blurt
+never adds one. Apple's recognizer supplies its own for anything it hears as a complete
+sentence, and "Disaster recovery test report" qualifies, so a name field would get a stop
+nobody asked for. Nothing about the *words* distinguishes that from a real sentence — the
+target does, so the target is what decides.
+
+Detected from the accessibility role (`AXTextField` vs `AXTextArea`) when the key goes down.
+Anything unrecognized is treated exactly as before. Abbreviations keep their stop, and
+addresses, paths and URLs are left alone entirely.
+
+If it misses in some app, that app is reporting an unexpected role — check the log:
+
+```bash
+/usr/bin/log show --predicate 'subsystem == "com.lsukev.blurt"' --last 5m --info | grep "target field"
+```
+
 ### Choosing what you hold
 
 Any modifier, any key, or any mouse button from the third onwards. Setup offers the four

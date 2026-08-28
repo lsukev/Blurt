@@ -22,17 +22,37 @@ public enum RuleCleanup {
         ("close paren", ") "),
     ]
 
-    public static func apply(_ raw: String) -> String {
+    public static func apply(_ raw: String, field: FieldKind = .unknown) -> String {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return text }
 
         text = stripFillers(from: text)
         text = applySpokenPunctuation(to: text)
         text = collapseWhitespace(in: text)
+
+        // A one-line field holds a label, not a sentence. Title-case it and strip the
+        // terminal stop — including one the engine supplied, which is the case no amount of
+        // reasoning about the words can catch.
+        if field == .singleLine {
+            text = TitleCase.apply(to: stripTerminalStop(text))
+            return text
+        }
+
         text = capitalizeSentences(in: text)
         text = addQuestionMarkIfNeeded(text)
 
         return text
+    }
+
+    /// Removes a trailing full stop, unless it belongs to the final word.
+    ///
+    /// Question and exclamation marks stay — someone dictating "Is this right?" into a
+    /// search box meant the mark, whereas nobody means the stop.
+    static func stripTerminalStop(_ text: String) -> String {
+        guard text.hasSuffix(".") else { return text }
+        let finalWord = text.components(separatedBy: " ").last ?? text
+        guard !Abbreviation.isAbbreviation(finalWord) else { return text }
+        return String(text.dropLast())
     }
 
     // MARK: - Terminal punctuation
