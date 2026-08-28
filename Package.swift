@@ -35,12 +35,21 @@ let package = Package(
             path: "Sources/BlurtInput",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        // The cleanup prompt: tone rules, and the fencing that keeps a dictionary entry
+        // from restructuring it. Prompt text is the part most likely to change and the
+        // easiest to break without noticing, so it is built here and tested.
+        .target(
+            name: "BlurtFormatting",
+            path: "Sources/BlurtFormatting",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .executableTarget(
             name: "Blurt",
             dependencies: [
                 "BlurtDictionary",
                 "BlurtSetup",
                 "BlurtInput",
+                "BlurtFormatting",
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ],
             path: "Sources/Blurt",
@@ -65,6 +74,12 @@ let package = Package(
             name: "BlurtInputTests",
             dependencies: ["BlurtInput"],
             path: "Tests/BlurtInputTests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "BlurtFormattingTests",
+            dependencies: ["BlurtFormatting"],
+            path: "Tests/BlurtFormattingTests",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

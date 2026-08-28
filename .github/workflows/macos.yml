@@ -43,7 +43,7 @@ jobs:
       # Filtered by MODULE, not by suite name: a suite-name list silently stops covering a
       # new suite the moment someone adds one, and the run still goes green.
       - name: Test the platform-neutral targets
-        run: swift test --filter '(BlurtDictionaryTests|BlurtSetupTests|BlurtInputTests)'
+        run: swift test --filter '(BlurtDictionaryTests|BlurtSetupTests|BlurtInputTests|BlurtFormattingTests)'
 
       - name: Confirm the vectors on both sides are identical
         run: |

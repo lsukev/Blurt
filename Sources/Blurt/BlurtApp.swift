@@ -1,3 +1,4 @@
+import BlurtFormatting
 import BlurtInput
 import AppKit
 import SwiftUI
@@ -228,6 +229,14 @@ private struct MenuContent: View {
                 .disabled(!FoundationModelFormatter.isAvailable)
             if let reason = FoundationModelFormatter.unavailableReason {
                 Text(reason).font(.caption)
+            }
+            // Tone only means anything through the model — the rule pass cannot rewrite.
+            if settings.smartCleanup, FoundationModelFormatter.isAvailable {
+                Picker("Tone", selection: $settings.toneMode) {
+                    ForEach(ToneMode.allCases, id: \.self) { tone in
+                        Text(tone.displayName).tag(tone)
+                    }
+                }
             }
         }
 

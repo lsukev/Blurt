@@ -1,3 +1,4 @@
+import BlurtFormatting
 import BlurtInput
 import SwiftUI
 
@@ -14,6 +15,38 @@ struct SettingsWindow: View {
             VStack(alignment: .leading, spacing: DS.Space.wide) {
                 panel(label: "Push to talk") {
                     BindingPicker(controller: controller)
+                }
+
+                panel(label: "Tone") {
+                    VStack(alignment: .leading, spacing: DS.Space.snug) {
+                        HStack(spacing: DS.Space.snug) {
+                            ForEach(ToneMode.allCases, id: \.self) { tone in
+                                TransportKey(
+                                    title: tone.displayName,
+                                    isEngaged: settings.toneMode == tone,
+                                    engagedColor: DS.Color.ink
+                                ) {
+                                    settings.toneMode = tone
+                                }
+                                .background {
+                                    if settings.toneMode == tone {
+                                        RoundedRectangle(cornerRadius: DS.Radius.control)
+                                            .fill(DS.Color.selection)
+                                    }
+                                }
+                            }
+                            Spacer()
+                        }
+                        Text(settings.toneMode.detail)
+                            .font(DS.Font.label)
+                            .foregroundStyle(DS.Color.inkSecondary)
+                        // Tone is a no-op without the model: the rule pass cannot rewrite.
+                        if !settings.smartCleanup || !FoundationModelFormatter.isAvailable {
+                            Text("Tone needs smart cleanup, which is off or unavailable.")
+                                .font(DS.Font.caption)
+                                .foregroundStyle(DS.Color.inkSecondary)
+                        }
+                    }
                 }
 
                 panel(label: "Model") {
