@@ -26,13 +26,17 @@ CONTENTS := $(BUNDLE)/Contents
 ## changes on every build — makes the user re-grant after every `make`. Signing with a
 ## stable Developer ID keeps the identity constant and the grant sticky. Falls back to
 ## ad-hoc ("-") on a machine without the cert.
+## Sparkle arrives as an XCFramework binary artifact, extracted under the scratch path.
+SPARKLE_FRAMEWORK := $(SCRATCH)/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework
+SPARKLE_BIN       := $(SCRATCH)/artifacts/sparkle/Sparkle/bin
+
 SIGN_ID := $(shell security find-identity -v -p codesigning 2>/dev/null \
              | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)".*/\1/')
 ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -
 endif
 
-.PHONY: all build app run install clean icon notarize
+.PHONY: all build app run install clean icon notarize release
 
 ## Timestamping is a network round-trip to Apple's timestamp server, which is wasted time
 ## on every local build — but notarization *requires* a secure timestamp, so the notarize
@@ -51,8 +55,15 @@ DIST           := dist
 
 all: app
 
+## The rpath is what lets the executable find the embedded Sparkle at runtime. It lives
+## here rather than in Package.swift as `linkerSettings`: in the manifest it would also
+## apply during `swift test` in CI, which doesn't link Sparkle and doesn't need it, and
+## `.unsafeFlags` in a manifest spreads to anything depending on the package.
+##
+## Without it the app builds, signs, notarizes — and then dies at launch with a dyld error.
 build:
-	swift build -c $(CONFIG) --scratch-path "$(SCRATCH)"
+	swift build -c $(CONFIG) --scratch-path "$(SCRATCH)" \
+		-Xlinker -rpath -Xlinker @executable_path/../Frameworks
 
 ## Regenerates AppIcon.icns from Tools/makeicon.swift. Not a dependency of `app` — the
 ## icon rarely changes and rendering 10 PNGs on every build is wasted time.
@@ -65,20 +76,41 @@ icon:
 ## and code signature, so the raw SwiftPM binary can't be used directly.
 app: build
 	@rm -rf "$(BUNDLE)"
-	@mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources"
+	@mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources" "$(CONTENTS)/Frameworks"
 	@cp $(BUILD) "$(CONTENTS)/MacOS/$(EXEC)"
+	@# SwiftPM links frameworks but does not embed them — that is Xcode's job, and this
+	@# bundle is assembled by hand. Copy it in ourselves or the app cannot start.
+	@cp -R "$(SPARKLE_FRAMEWORK)" "$(CONTENTS)/Frameworks/"
 	@cp Resources/Info.plist "$(CONTENTS)/Info.plist"
 	@if [ -f Resources/AppIcon.icns ]; then cp Resources/AppIcon.icns "$(CONTENTS)/Resources/"; fi
 	@printf 'APPL????' > "$(CONTENTS)/PkgInfo"
 	@# Belt and braces: the staging dir isn't synced, but the copied binary can still carry
 	@# xattrs inherited from the synced .build directory.
 	@xattr -cr "$(BUNDLE)"
+	@# Signing runs INSIDE-OUT. Sparkle's framework carries its own executables — the
+	@# updater app, the installer, XPC services — and each must be signed before the
+	@# framework, which must be signed before the app. Sign the app first and notarization
+	@# rejects the submission with a message that blames the framework rather than the
+	@# ordering. `--deep` is not a shortcut for this: it is deprecated and does not apply
+	@# entitlements correctly.
+	@F="$(CONTENTS)/Frameworks/Sparkle.framework"; \
+	for nested in \
+		"$$F/Versions/B/XPCServices/Installer.xpc" \
+		"$$F/Versions/B/XPCServices/Downloader.xpc" \
+		"$$F/Versions/B/Autoupdate" \
+		"$$F/Versions/B/Updater.app"; do \
+		[ -e "$$nested" ] && codesign --force --sign "$(SIGN_ID)" --options runtime \
+			$(TIMESTAMP) "$$nested" || true; \
+	done; \
+	codesign --force --sign "$(SIGN_ID)" --options runtime $(TIMESTAMP) "$$F"
 	@codesign --force --sign "$(SIGN_ID)" \
 		--entitlements Resources/$(EXEC).entitlements \
 		--options runtime \
 		$(TIMESTAMP) \
 		"$(BUNDLE)"
-	@echo "built $(BUNDLE)  [signed: $(SIGN_ID)]"
+	@codesign --verify --strict --verbose=1 "$(BUNDLE)" >/dev/null 2>&1 \
+		&& echo "built $(BUNDLE)  [signed: $(SIGN_ID)]" \
+		|| { echo "SIGNATURE INVALID — refusing to continue"; exit 1; }
 
 ## Only ever targets the Blurt executable — never another dictation app that happens to
 ## be running under a similar name.
@@ -118,6 +150,15 @@ notarize:
 	@echo "--- gatekeeper ---"
 	@spctl -a -vvv -t exec "$(BUNDLE)" || true
 	@echo "stapled: $(DIST)/$(EXEC).zip"
+
+## Cut a release. The pipeline outgrew a Makefile target — it needs preflight checks and
+## error handling — so it lives in Tools/release.sh and this just hands it the paths.
+##
+##   make release VERSION=0.4.0
+release:
+	@BUNDLE="$(BUNDLE)" SPARKLE_BIN="$(SPARKLE_BIN)" EXEC="$(EXEC)" DIST="$(DIST)" \
+		NOTARY_PROFILE="$(NOTARY_PROFILE)" VERSION="$(VERSION)" \
+		bash Tools/release.sh
 
 clean:
 	@rm -rf .build "$(STAGE)" "$(SCRATCH)"

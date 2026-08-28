@@ -113,7 +113,20 @@ running app is attributed to itself.
 (`open -a Blurt --args --diagnose` is not a workaround. Exiting during launch breaks the
 LaunchServices handshake and it fails with -600.)
 
-### Sending a build to someone else
+### Cutting a release
+
+```bash
+make release VERSION=0.4.0
+```
+
+Builds, notarizes, staples, signs the appcast, tags, and publishes to GitHub Releases.
+Existing installs pick it up on their next check.
+
+`CFBundleVersion` is bumped by the script, not by hand. Sparkle compares that number — not
+the marketing string — so it has to increase monotonically, and hand-editing it is how you
+eventually ship a version the updater considers older than what is installed.
+
+### Sending a build to someone else, without releasing
 
 ```bash
 make notarize
@@ -240,6 +253,20 @@ change.
 | Latency | low | ~80 ms | 200–500 ms |
 
 ---
+
+## Updates
+
+Blurt checks `https://lsukev.github.io/Blurt/appcast.xml` on launch and daily, and offers
+anything newer. **Check for Updates…** is in the app menu and the menu bar item.
+
+Every update is EdDSA-signed, and the public key is in `Info.plist`. That — not access
+control — is what makes the public feed safe: the updater carries no credentials, so the
+feed and payload were always going to be fetchable by anyone. Someone who compromised the
+repo outright still could not ship an update Blurt would install.
+
+**The private key lives in the login keychain and is not recoverable.** Lose it and no
+existing install can ever be updated again; they all hold the matching public key and will
+reject anything signed with a new one. `generate_keys -x` exports it for backup.
 
 ## Not built yet
 

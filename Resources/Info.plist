@@ -39,5 +39,13 @@
 	<string>Blurt listens while you hold the push-to-talk key so it can turn your speech into text.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Blurt transcribes your speech on-device to insert text where you're typing.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://lsukev.github.io/Blurt/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>lt4mEc+S9hfg8NAeHZbStcLS8udoobV9sQVLwjQa6g4=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

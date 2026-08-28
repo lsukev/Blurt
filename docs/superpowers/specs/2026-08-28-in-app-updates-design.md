@@ -1,6 +1,6 @@
 # In-app updates
 
-**Status:** design approved, not implemented
+**Status:** implemented
 **Date:** 2026-08-28
 
 Blurt checks for new versions, tells the user, and installs one on request. Built on
@@ -189,9 +189,10 @@ No CI changes. The appcast is not code, and releases run locally by design.
 
 ## Open
 
-- Exact path to `generate_appcast` and `generate_keys` under SwiftPM's resolved artifact
-  bundle. They ship with Sparkle's release artifacts; the path gets pinned during
-  implementation rather than guessed here.
+- ~~Exact path to `generate_appcast` and `generate_keys`~~ — resolved. Sparkle 2.9.6 puts
+  them at `$SCRATCH/artifacts/sparkle/Sparkle/bin/`, and the framework at
+  `$SCRATCH/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/`. Both are
+  `Makefile` variables now.
 - Whether release signing eventually moves to GitHub Actions. Deferred deliberately: it
   would require the Developer ID certificate, its password, the notarization credential and
   the EdDSA private key all living in GitHub secrets. Worth revisiting once the local flow

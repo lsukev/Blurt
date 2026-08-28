@@ -27,6 +27,8 @@ struct BlurtApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { delegate.updates.checkForUpdates() }
+                    .disabled(!delegate.updates.canCheck)
                 Button("Reveal Dictionary File") {
                     NSWorkspace.shared.activateFileViewerSelecting([DictionaryStore.fileURL])
                 }
@@ -41,7 +43,7 @@ struct BlurtApp: App {
 
         // Secondary now: status and the hotkey while you're working in another app.
         MenuBarExtra {
-            MenuContent(controller: delegate.controller)
+            MenuContent(controller: delegate.controller, updates: delegate.updates)
         } label: {
             Image(systemName: delegate.controller.state.isActive ? "waveform.circle.fill" : "waveform")
         }
@@ -57,6 +59,7 @@ struct BlurtApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let controller = DictationController()
+    let updates = UpdateController()
     private var hud: HUDPanel?
     private var stateObservation: NSObjectProtocol?
 
@@ -183,6 +186,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 private struct MenuContent: View {
     @Bindable var controller: DictationController
+    let updates: UpdateController
     @State private var settings = Settings.shared
     @Environment(\.openWindow) private var openWindow
     @State private var isPreloadingParakeet = false
@@ -279,6 +283,9 @@ private struct MenuContent: View {
 
         // The only place permissions can be reported truthfully: the running app is
         // attributed to itself, where a terminal-launched copy is attributed to the terminal.
+        Button("Check for Updates…") { updates.checkForUpdates() }
+            .disabled(!updates.canCheck)
+
         Button("Copy Diagnostics") { Diagnostics.copyToPasteboard() }
 
         Button("Run Setup Again…") {

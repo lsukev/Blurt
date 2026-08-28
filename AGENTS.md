@@ -146,6 +146,15 @@ tccutil reset Accessibility com.lsukev.blurt
 A bare `tccutil reset Accessibility` wipes every app on the machine. Then quit System
 Settings entirely (⌘Q) before reopening; the Privacy pane caches its list.
 
+**Sparkle signing runs inside-out, and the rpath is not optional.** SwiftPM links
+frameworks but does not embed them, so the `Makefile` copies `Sparkle.framework` in itself
+and links with `-rpath @executable_path/../Frameworks`; without it the app builds, signs,
+notarizes and then dies at launch with a dyld error. Signing goes deepest-first — XPC
+services, `Autoupdate`, `Updater.app`, the framework, then the app. Sign the app first and
+notarization rejects the submission with a message blaming the framework rather than the
+ordering. `--deep` is not a substitute: deprecated, and it does not apply entitlements
+correctly.
+
 **`log` may be shadowed in the user's shell.** Use `/usr/bin/log` explicitly.
 
 **TCC answers for the parent process, not for a shell-exec'd child.** Run

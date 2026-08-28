@@ -7,7 +7,10 @@ let package = Package(
     dependencies: [
         // Parakeet TDT as CoreML on the Neural Engine. Optional at runtime — Apple's
         // SpeechTranscriber remains the default and needs no dependency at all.
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.15.6")
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.15.6"),
+        // In-app updates. Sparkle handles the part that must not be hand-rolled: replacing
+        // a running .app atomically and relaunching it.
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
     ],
     targets: [
         // The dictionary is its own target so it can be tested directly, and because its
@@ -51,6 +54,7 @@ let package = Package(
                 "BlurtInput",
                 "BlurtFormatting",
                 .product(name: "FluidAudio", package: "FluidAudio"),
+                .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources/Blurt",
             swiftSettings: [

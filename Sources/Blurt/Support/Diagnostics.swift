@@ -124,6 +124,16 @@ enum Diagnostics {
             ("file", DictionaryStore.fileURL.path),
         ])
 
+        // MARK: Updates
+        out += section("updates", [
+            ("feed", Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String ?? "not configured"),
+            ("signing key", Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") != nil
+                ? "present" : "MISSING — updates cannot be verified"),
+            ("automatic", UserDefaults.standard.object(forKey: "SUEnableAutomaticChecks") as? Bool
+                ?? (Bundle.main.object(forInfoDictionaryKey: "SUEnableAutomaticChecks") as? Bool ?? false)
+                ? "on" : "off"),
+        ])
+
         // MARK: Verdict
         out += "\n"
         if blockers.isEmpty {
