@@ -66,10 +66,16 @@ struct FoundationModelFormatter: TextFormatter {
             return await fallback.format(trimmed, field: field)
         }
 
-        // Read per call rather than at construction: both can change between dictations,
-        // and a formatter holding a stale tone or a stale word list is worse than the hop.
+        // Read before the routing check: tone decides whether the model is needed at all.
         let (tone, terms) = await MainActor.run {
             (Settings.shared.toneMode, DictionaryStore.shared.biasPhrases)
+        }
+
+        // The model costs 420–1435 ms. Worth it when it can do something the rules cannot;
+        // pure waiting when it cannot. See `CleanupRouting` for what counts.
+        guard CleanupRouting.needsModel(trimmed, tone: tone, field: field) else {
+            Log.speech.info("cleanup: rules only — nothing here needs the model")
+            return await fallback.format(trimmed, field: field)
         }
 
         do {

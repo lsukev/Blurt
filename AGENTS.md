@@ -243,6 +243,32 @@ What was measured and left alone: the app burns **no CPU at idle**, and `capital
 costs 244 µs on a 1,900-character dictation — genuinely O(n) work, and irrelevant beside
 transcription.
 
+## Latency, if you touch cleanup
+
+Measured end to end on a real dictation, and the numbers overturned the obvious guess.
+Apple's `SpeechAnalyzer` finalize — the suspected bottleneck — is **94–200 ms**. Cleanup was
+**3332 ms of a 3533 ms wait**.
+
+**The model session is prewarmed at key-down, not built at key-up.** A fresh
+`LanguageModelSession` per utterance meant prefilling the whole instruction block — rules,
+tone, number handling, up to sixty dictionary terms — from cold, *after* the user stopped
+speaking. Everything those instructions depend on is known when the key goes down, and what
+follows is seconds of speech. Moving the prefill there took cleanup to **420–1435 ms**.
+
+Do not "optimize" this by caching one session across dictations. `LanguageModelSession`
+accumulates a transcript, so it would grow context every time — slower, and eventually
+confused about which utterance it is cleaning. One session per utterance, warmed early,
+discarded after.
+
+**Not every utterance goes to the model.** `CleanupRouting` skips it when the rules can
+plausibly do the whole job. The tempting version of this rule is "skip short text" and it is
+wrong: "send it Tuesday, actually Wednesday" is five words and needs the model, because
+applying a spoken correction means knowing which part of the sentence is replaced. The test
+for that case exists; don't simplify it away.
+
+The remaining cost is the model generating tokens, which scales with output length. Nothing
+in this codebase can shorten it.
+
 ## Regex, if you touch the dictionary
 
 The two engines are not identical. Measured across 30 cases, **9 diverged**. Two affect this
