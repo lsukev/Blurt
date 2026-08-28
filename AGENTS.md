@@ -155,6 +155,12 @@ notarization rejects the submission with a message blaming the framework rather 
 ordering. `--deep` is not a substitute: deprecated, and it does not apply entitlements
 correctly.
 
+**Verify a release with `--check-updates`, not by watching a background check.** A
+scheduled Sparkle check moves `SULastCheckTime` whether or not it found anything and leaves
+almost no other evidence, so it cannot tell you a feed works. `--check-updates` runs
+`checkForUpdateInformation()` headless and prints FOUND or NONE. Proven both ways against
+the live feed: build 4 reports NONE, a resigned build 3 reports FOUND 0.4.0.
+
 **`log` may be shadowed in the user's shell.** Use `/usr/bin/log` explicitly.
 
 **TCC answers for the parent process, not for a shell-exec'd child.** Run

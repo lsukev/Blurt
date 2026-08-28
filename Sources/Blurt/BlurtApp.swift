@@ -12,6 +12,7 @@ struct BlurtApp: App {
     /// `applicationDidFinishLaunching` runs after the app has already activated and put a
     /// window on screen — too late to be a command-line tool.
     init() {
+        if CommandLine.arguments.contains("--check-updates") { UpdateProbe.run() }
         guard CommandLine.arguments.contains("--diagnose") else { return }
         exit(Diagnostics.run())
     }

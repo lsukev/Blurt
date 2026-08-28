@@ -104,7 +104,17 @@ Reports the version, whether the on-device model is available and why not, the a
 engine, the push-to-talk binding and which event types its tap requests, and how much of
 your dictionary reached the engine. Exits non-zero when Blurt cannot dictate as configured.
 
-**It cannot report permissions from a terminal, and says so rather than guessing.** TCC
+To check the update feed specifically:
+
+```bash
+/Applications/Blurt.app/Contents/MacOS/Blurt --check-updates
+```
+
+Fetches the appcast, evaluates it against the installed build, and prints what it found —
+headless, no UI. This is what proves a release is actually installable rather than merely
+published: it exercises the fetch, the signature check, and the version comparison.
+
+**`--diagnose` cannot report permissions from a terminal, and says so rather than guessing.** TCC
 attributes a directly-exec'd process to its responsible parent — your terminal — and answers
 on that process's behalf, so both grants read as missing however thoroughly they were
 granted. For a report that includes them, use **Copy Diagnostics** in the menu bar item: the
