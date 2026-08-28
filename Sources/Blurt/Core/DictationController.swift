@@ -148,6 +148,18 @@ final class DictationController {
         Log.inject.info(
             "target field: \(String(describing: focused.kind), privacy: .public) · \(focused.describedAs, privacy: .public)"
         )
+        // Warm the cleanup model now, while the user is about to spend seconds talking.
+        // Cleanup measured 3332ms of a 3533ms wait because the instruction prefill happened
+        // after they let go; this moves it into the time they were speaking anyway.
+        let settings = Settings.shared
+        if settings.cleanupEnabled, settings.smartCleanup {
+            FoundationModelFormatter.prewarm(
+                tone: settings.toneMode,
+                knownTerms: DictionaryStore.shared.biasPhrases,
+                field: targetField
+            )
+        }
+
         isComparing = Settings.shared.compareMode
         recorded.removeAll(keepingCapacity: true)
         engineName = isComparing ? "Comparing…" : Settings.shared.engine.displayName

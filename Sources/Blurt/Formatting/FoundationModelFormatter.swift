@@ -18,6 +18,22 @@ struct FoundationModelFormatter: TextFormatter {
     /// Deterministic fallback used on timeout, unavailability, or a rejected response.
     private let fallback = RuleBasedFormatter()
 
+    /// Starts building and warming the session for an utterance about to be spoken.
+    ///
+    /// Called when the key goes down. Everything the instructions depend on — tone, the
+    /// dictionary, the target field — is already known then, and what follows is seconds of
+    /// speech during which the model can prefill instead of making the user wait afterwards.
+    @MainActor
+    static func prewarm(tone: ToneMode, knownTerms: [String], field: FieldKind) {
+        guard isAvailable else { return }
+        let instructions = CleanupInstructions.build(
+            tone: tone, knownTerms: knownTerms, field: field
+        )
+        Task.detached(priority: .userInitiated) {
+            await CleanupModel.shared.prepare(instructions: instructions)
+        }
+    }
+
     /// Past this, taking the raw text beats making the user wait.
     private let timeout: Duration = .seconds(4)
 
@@ -109,12 +125,11 @@ struct FoundationModelFormatter: TextFormatter {
         knownTerms: [String],
         field: FieldKind
     ) async throws -> String {
-        let session = LanguageModelSession(
-            instructions: CleanupInstructions.build(tone: tone, knownTerms: knownTerms, field: field)
-        )
-
-        let response = try await session.respond(
-            to: "Clean up this transcript:\n\n\(text)",
+        // The session was built and prewarmed at key-down, so the instruction prefill has
+        // already happened by the time anything is asked of it. See `CleanupModel`.
+        return try await CleanupModel.shared.respond(
+            instructions: CleanupInstructions.build(tone: tone, knownTerms: knownTerms, field: field),
+            prompt: "Clean up this transcript:\n\n\(text)",
             options: GenerationOptions(
                 // Near-deterministic: this is a formatting pass, not a creative one.
                 temperature: 0.1,
@@ -122,8 +137,6 @@ struct FoundationModelFormatter: TextFormatter {
                 maximumResponseTokens: 1_200
             )
         )
-
-        return response.content.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Rejects output that isn't recognizably a cleaned version of the input.
