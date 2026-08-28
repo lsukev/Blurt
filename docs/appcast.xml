@@ -3,6 +3,16 @@
     <channel>
         <title>Blurt</title>
         <item>
+            <title>0.10.0</title>
+            <pubDate>Fri, 28 Aug 2026 14:08:52 -0500</pubDate>
+            <link>https://github.com/lsukev/Blurt</link>
+            <sparkle:version>10</sparkle:version>
+            <sparkle:shortVersionString>0.10.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/lsukev/Blurt/releases/download/v0.10.0/Blurt.zip" length="10559927" type="application/octet-stream" sparkle:edSignature="dGBkniSmwzEzaAPXEBTUmTaAIJ1hrhcyAJnQaO6TBViohbTtzvLmmO0fMM4hqJDbQaYg8MyhnYuKPcEEYxSOAA=="/>
+        </item>
+        <item>
             <title>0.9.0</title>
             <pubDate>Fri, 28 Aug 2026 13:49:40 -0500</pubDate>
             <link>https://github.com/lsukev/Blurt</link>
@@ -21,16 +31,6 @@
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/lsukev/Blurt/releases/download/v0.8.0/Blurt.zip" length="10547140" type="application/octet-stream" sparkle:edSignature="Tq9NMhAegBmX0DNk4MXv3vjzcNCxWGboQnvVnanP3+iIMz+S9yBQ4mWs0285Tz+xzLzHkJTmPG4yfzr5XDUoDw=="/>
-        </item>
-        <item>
-            <title>0.7.0</title>
-            <pubDate>Fri, 28 Aug 2026 13:14:08 -0500</pubDate>
-            <link>https://github.com/lsukev/Blurt</link>
-            <sparkle:version>7</sparkle:version>
-            <sparkle:shortVersionString>0.7.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/lsukev/Blurt/releases/download/v0.7.0/Blurt.zip" length="10544712" type="application/octet-stream" sparkle:edSignature="2ET8XBu+1Vprdz91uuwFJVbYyG94dHi/H75w8mKNnlDwsihqzw7tP3X7TRpHCXA9F1EIpb/+RkY8cpzSlqr7Dg=="/>
         </item>
     </channel>
 </rss>
