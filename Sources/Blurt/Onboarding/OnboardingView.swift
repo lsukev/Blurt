@@ -1,3 +1,4 @@
+import BlurtSetup
 import SwiftUI
 
 /// First-run setup: a fixed rail of lamps down the left, and a stage on the right that
@@ -20,7 +21,7 @@ struct OnboardingView: View {
                 BrushedPanel()
 
                 HStack(spacing: 0) {
-                    SetupRail(current: model.step, permissions: permissions)
+                    SetupRail(model: model)
                         .frame(width: Self.railWidth)
 
                     Rectangle()
@@ -54,7 +55,7 @@ struct OnboardingView: View {
     private var stage: some View {
         VStack(alignment: .leading, spacing: DS.Space.roomy) {
             HStack {
-                Silkscreen(text: "Step \(model.step.rawValue + 1) of \(OnboardingModel.Step.allCases.count)",
+                Silkscreen(text: "Step \(model.step.rawValue + 1) of \(SetupStep.allCases.count)",
                            color: DS.Color.inkSecondary)
                 Spacer()
                 Screw()
@@ -76,8 +77,8 @@ struct OnboardingView: View {
 
 /// The step list: a lamp per step, lit as you clear it.
 private struct SetupRail: View {
-    let current: OnboardingModel.Step
-    let permissions: PermissionMonitor
+    let model: OnboardingModel
+    var current: SetupStep { model.step }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.wide) {
@@ -96,7 +97,7 @@ private struct SetupRail: View {
                     .padding(.horizontal, DS.Space.snug)
                     .padding(.bottom, DS.Space.tight)
 
-                ForEach(OnboardingModel.Step.allCases, id: \.self) { step in
+                ForEach(SetupStep.allCases, id: \.self) { step in
                     row(for: step)
                 }
             }
@@ -112,10 +113,10 @@ private struct SetupRail: View {
         .padding(DS.Space.roomy)
     }
 
-    private func row(for step: OnboardingModel.Step) -> some View {
+    private func row(for step: SetupStep) -> some View {
         let isCurrent = step == current
         return HStack(spacing: DS.Space.snug) {
-            Lamp(color: DS.Color.statusLamp, isLit: isDone(step))
+            Lamp(color: DS.Color.statusLamp, isLit: model.isLampLit(for: step))
             Silkscreen(text: step.title, color: isCurrent ? DS.Color.ink : DS.Color.silkscreen)
             Spacer(minLength: 0)
         }
@@ -127,17 +128,6 @@ private struct SetupRail: View {
                     .fill(DS.Color.selection)
                     .strokeBorder(DS.Color.selectionEdge, lineWidth: DS.Border.hairline)
             }
-        }
-    }
-
-    /// A step's lamp lights when it's genuinely behind you. For the two permission steps
-    /// that means the grant is actually held — walking past one with Skip leaves it dark,
-    /// which is the truth and is what the deck's banner is about.
-    private func isDone(_ step: OnboardingModel.Step) -> Bool {
-        switch step {
-        case .accessibility: permissions.accessibility
-        case .microphone: permissions.microphone
-        default: step.rawValue < current.rawValue
         }
     }
 }

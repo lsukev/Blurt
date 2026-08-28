@@ -1,78 +1,61 @@
 import AVFoundation
 import AppKit
+import BlurtSetup
 import Foundation
 import Observation
 
-/// Drives first-run setup: which step is on screen, when it advances, and what the
-/// Accessibility step offers when macOS gets stubborn.
+/// First-run setup: the side effects.
 ///
-/// Two rules shape the whole thing:
+/// The decisions — step order, which lamps are lit, when the TCC reset is worth offering —
+/// live in `BlurtSetup.SetupFlow`, where they can be tested without macOS 26, a microphone
+/// or a TCC database. This type owns one of those and does the things it cannot: prompting,
+/// opening System Settings, running `tccutil`, relaunching.
 ///
-/// - **Grants advance the flow; buttons don't.** There is no "Next" after a permission step.
-///   The lamp lighting *is* the confirmation, so the user flips the switch, comes back, and
-///   the wizard has already moved on.
-/// - **Nothing traps you.** Every step can be skipped through to the deck, which shows a
-///   banner instead. A wizard that holds a tester hostage over a permission is how you get
-///   the app deleted rather than debugged.
+/// Two rules shape the flow, and both are enforced in `SetupFlow` rather than here:
+///
+/// - **Grants advance it; buttons don't.** No "Next" after a permission step — the lamp
+///   lighting *is* the confirmation.
+/// - **Nothing traps you.** Every step skips through to the deck, which shows a banner.
 @MainActor
 @Observable
 final class OnboardingModel {
-    enum Step: Int, CaseIterable {
-        case welcome, accessibility, microphone, key, tryIt, done
+    typealias Step = SetupStep
 
-        var title: String {
-            switch self {
-            case .welcome: "Welcome"
-            case .accessibility: "Accessibility"
-            case .microphone: "Microphone"
-            case .key: "Key"
-            case .tryIt: "Try it"
-            case .done: "Done"
-            }
-        }
-    }
+    private var flow = SetupFlow()
 
-    private(set) var step: Step = .welcome
+    var step: Step { flow.step }
 
-    /// Set once the user has been sent to System Settings and the grant still hasn't landed.
-    /// We cannot detect the stale-row state directly — `AXIsProcessTrusted()` reports false
-    /// exactly as it would if the user had simply not done it yet. What we *can* detect is
-    /// "you were sent to do this, enough time has passed, and it still isn't true", which is
-    /// the honest trigger for offering the fix.
+    /// When the user was last sent to System Settings, which is what makes the wedged-grant
+    /// offer possible to reason about. Nil until they've actually been sent.
+    private var accessibilityPromptedAt: Date?
     private(set) var accessibilityLooksStuck = false
-
-    /// True while the user is holding their push-to-talk key on the key step, so the panel
-    /// can show that Blurt sees it.
-    var isTestingKey = false
 
     private let permissions = PermissionMonitor.shared
     @ObservationIgnored private var stuckTask: Task<Void, Never>?
 
-    /// How long to wait after sending someone to System Settings before offering the reset.
-    /// Long enough that a user who is simply reading isn't told they have a problem.
-    private static let stuckThreshold: Duration = .seconds(25)
-
     // MARK: - Navigation
 
     func advance() {
-        guard let next = Step(rawValue: step.rawValue + 1) else {
-            finish()
-            return
-        }
-        step = next
+        flow.advance()
+        if flow.isFinished { commitCompletion() }
     }
 
     func go(to step: Step) {
-        self.step = step
+        flow.go(to: step)
     }
 
     /// Leaves setup early. The deck's banner takes over from here.
     func skipToApp() {
-        Log.app.info("Setup skipped at step \(self.step.title, privacy: .public)")
+        Log.app.info("Setup skipped at step \(self.flow.step.title, privacy: .public)")
         finish()
     }
 
     func finish() {
+        flow.finish()
+        commitCompletion()
+    }
+
+    private func commitCompletion() {
         stuckTask?.cancel()
         Settings.shared.hasCompletedSetup = true
     }
@@ -82,16 +65,27 @@ final class OnboardingModel {
         Settings.shared.hasCompletedSetup = false
     }
 
+    /// Whether a step's lamp is lit. Delegates to `SetupFlow` so the rule — permission
+    /// lamps report the grant, not how far you've walked — is stated once and tested.
+    func isLampLit(for step: Step) -> Bool {
+        flow.isLampLit(
+            for: step,
+            accessibility: permissions.accessibility,
+            microphone: permissions.microphone
+        )
+    }
+
     // MARK: - Accessibility
 
     /// Puts Blurt in the Accessibility list, *then* opens the pane.
     ///
-    /// Order matters and is easy to get backwards: until `AXIsProcessTrustedWithOptions`
-    /// has run with the prompt option, the app isn't in that list at all, and the user
-    /// arrives at a pane with nothing to switch on.
+    /// Order matters and is easy to get backwards: until `AXIsProcessTrustedWithOptions` has
+    /// run with the prompt option the app isn't in that list at all, and the user arrives at
+    /// a pane with nothing to switch on.
     func requestAccessibility() {
         Permissions.promptForAccessibility()
         Permissions.openAccessibilitySettings()
+        accessibilityPromptedAt = Date()
         armStuckTimer()
     }
 
@@ -103,11 +97,21 @@ final class OnboardingModel {
         stuckTask?.cancel()
         accessibilityLooksStuck = false
         stuckTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: Self.stuckThreshold)
-            guard let self, !Task.isCancelled else { return }
-            guard !self.permissions.accessibility, self.step == .accessibility else { return }
-            self.accessibilityLooksStuck = true
-            Log.app.info("Accessibility still not granted after prompt — offering reset")
+            try? await Task.sleep(for: .seconds(1))
+            while !Task.isCancelled {
+                guard let self else { return }
+                self.accessibilityLooksStuck = SetupFlow.shouldOfferReset(
+                    promptedAt: self.accessibilityPromptedAt,
+                    now: Date(),
+                    isGranted: self.permissions.accessibility,
+                    currentStep: self.flow.step
+                )
+                if self.accessibilityLooksStuck {
+                    Log.app.info("Accessibility still not granted after prompt — offering reset")
+                    return
+                }
+                try? await Task.sleep(for: .seconds(2))
+            }
         }
     }
 
@@ -117,7 +121,7 @@ final class OnboardingModel {
     func accessibilityDidLand() {
         stuckTask?.cancel()
         accessibilityLooksStuck = false
-        if step == .accessibility { advance() }
+        if flow.step == .accessibility { advance() }
     }
 
     // MARK: - Microphone
@@ -133,7 +137,7 @@ final class OnboardingModel {
         permissions.refresh()
 
         if granted {
-            if step == .microphone { advance() }
+            if flow.step == .microphone { advance() }
         } else if alreadyDecided {
             Log.app.info("Microphone previously denied — sending the user to Settings")
             Permissions.openMicrophoneSettings()

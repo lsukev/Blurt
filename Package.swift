@@ -18,10 +18,20 @@ let package = Package(
             path: "Sources/BlurtDictionary",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        // The setup flow's decisions — step order, which lamps are lit, when to offer the
+        // TCC reset — are worth testing, and the code that acts on them (TCC, event taps,
+        // System Settings) is not testable at all. Same split, and same reason, as the
+        // dictionary above: platform-neutral, so CI can run it without macOS 26.
+        .target(
+            name: "BlurtSetup",
+            path: "Sources/BlurtSetup",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .executableTarget(
             name: "Blurt",
             dependencies: [
                 "BlurtDictionary",
+                "BlurtSetup",
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ],
             path: "Sources/Blurt",
@@ -34,6 +44,12 @@ let package = Package(
             dependencies: ["BlurtDictionary"],
             path: "Tests/BlurtDictionaryTests",
             resources: [.copy("dictionary-test-vectors.json")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "BlurtSetupTests",
+            dependencies: ["BlurtSetup"],
+            path: "Tests/BlurtSetupTests",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

@@ -42,6 +42,12 @@ swift test --filter VectorTests                    # macOS side
 cd windows && dotnet test Blurt.CrossPlatform.slnf # Windows side, runs anywhere
 ```
 
+There is a second platform-neutral target with the same shape: `BlurtSetup` holds the
+first-run flow's *decisions* — step order, which lamps are lit, when the wedged-TCC reset is
+worth offering — precisely so they can be tested without macOS 26, a microphone or a TCC
+database. `swift test --filter SetupFlowTests`. The side effects live in `OnboardingModel`
+in the app target and are not testable; keep the seam where it is.
+
 The Swift copy at `Tests/BlurtDictionaryTests/dictionary-test-vectors.json` is a copy, and
 CI fails if it drifts from `shared/`. After editing the shared file:
 
@@ -58,11 +64,13 @@ cp shared/dictionary-test-vectors.json Tests/BlurtDictionaryTests/
 omits it; everything else, including the whole UI suite, builds and tests on macOS in about
 half a second.
 
-**`swift build` fails with "input file was modified during the build."** The repo lives in an
-iCloud-synced folder and the sync engine touches files mid-compile. **Always build with
-`make`**, which uses `--scratch-path` outside the synced tree. A bare `swift build` also
-writes a `.build/` directory into iCloud, which makes every subsequent build minutes slower.
-If you see this error, wait a few seconds and retry.
+**`swift build` fails with "input file was modified during the build."** This happens when
+the checkout sits in a file-provider-synced folder (iCloud Desktop & Documents, Dropbox) and
+the sync engine touches files mid-compile. It is not universal — check before repeating it
+as fact about a given machine. **Always build with `make`** regardless: it uses
+`--scratch-path` under `~/Library/Caches`, which is never synced, so the race cannot happen
+and no `.build/` lands next to the source. If you see this error, wait a few seconds and
+retry.
 
 **Compare mode doesn't type anything.** By design — `Settings.compareMode` runs every engine
 on one recording and shows them side by side. If both injected, two transcripts would fight
@@ -94,6 +102,10 @@ face in light appearance, black face in dark. Two rules that are not negotiable:
 
 - **Red means recording.** Nothing else in the app is red.
 - **Amber and green are instrumentation only** — level meters, never UI chrome.
+
+A consequence worth stating, because it catches people: a "granted"/"done" indicator cannot
+be green, which is the colour every other app reaches for. Use `DS.Color.statusLamp` — warm
+white, which is what function lamps on the actual hardware were.
 
 Explicitly ruled out: neon, vaporwave, synthwave, purple/pink gradients, glowing text, chrome
 lettering, grid horizons. There are **no gradients anywhere**; depth comes from flat panels,
@@ -185,9 +197,10 @@ lookahead, `\p{L}`, and `$1`–`$9` in replacements. Nothing else.
 ## What isn't built
 
 1. **Command Mode** — select text, hold a second key, "make this more formal."
-2. **Onboarding** — a first-run window walking through the macOS permissions.
-3. **Notarization** (macOS) and **code signing** (Windows). Both apps are unsigned for
-   distribution, so Windows users will meet SmartScreen.
+2. **Notarization** (macOS) and **code signing** (Windows). macOS signs with a Developer ID
+   — which is what keeps TCC grants sticky — but does not notarize, so a build handed to
+   anyone else is refused by Gatekeeper until they right-click ▸ Open. Windows users meet
+   SmartScreen.
 4. **An installer** for Windows, and model download from inside the app rather than by
    following `docs/PARAKEET-WINDOWS.md` by hand.
 
