@@ -208,3 +208,31 @@ struct AbbreviationTests {
                 == "Disaster Recovery Test Report")
     }
 }
+
+@Suite("Terminal punctuation in a label")
+struct LabelPunctuationTests {
+
+    // Reported: dictating "2026 Data Center and Report" into a Name box produced an
+    // exclamation mark nobody spoke. The engine adds those from intonation.
+
+    @Test("an exclamation mark is stripped from a label")
+    func stripsExclamation() {
+        #expect(RuleCleanup.apply("data center report!", field: .singleLine) == "Data Center Report")
+    }
+
+    @Test("a question mark survives, because the engine emits those from structure")
+    func keepsQuestionMark() {
+        #expect(RuleCleanup.apply("are you coming?", field: .singleLine) == "Are You Coming?")
+    }
+
+    @Test("prose keeps both, whoever supplied them")
+    func proseIsUntouched() {
+        #expect(RuleCleanup.apply("That's great!", field: .multiLine) == "That's great!")
+        #expect(RuleCleanup.apply("Really?", field: .multiLine) == "Really?")
+    }
+
+    @Test("an abbreviation still keeps its stop")
+    func abbreviationsUnaffected() {
+        #expect(RuleCleanup.apply("figures for the U.S.", field: .singleLine).hasSuffix("U.S."))
+    }
+}

@@ -28,6 +28,9 @@ public enum RuleCleanup {
 
         text = stripFillers(from: text)
         text = applySpokenPunctuation(to: text)
+        // Before capitalization, so "twenty twenty six" becomes 2026 rather than being
+        // sentence-cased into "Twenty twenty six" and then digitized inconsistently.
+        text = SpokenNumbers.digitize(text)
         text = collapseWhitespace(in: text)
 
         // A one-line field holds a label, not a sentence. Title-case it and strip the
@@ -44,14 +47,22 @@ public enum RuleCleanup {
         return text
     }
 
-    /// Removes a trailing full stop, unless it belongs to the final word.
+    /// Removes trailing punctuation that a label would not carry.
     ///
-    /// Question and exclamation marks stay — someone dictating "Is this right?" into a
-    /// search box meant the mark, whereas nobody means the stop.
+    /// Stops and exclamation marks both go. The first version kept "!" on the reasoning
+    /// that someone typing one means it — which was wrong twice over: nobody titles a
+    /// document with an exclamation mark, and the one that prompted this was produced by
+    /// the speech engine from intonation, not typed at all.
+    ///
+    /// A question mark stays. The engine emits those from interrogative sentence structure
+    /// rather than from tone, so it is far likelier to be real — and an email subject or a
+    /// search box holding an actual question is a normal thing.
     static func stripTerminalStop(_ text: String) -> String {
-        guard text.hasSuffix(".") else { return text }
-        let finalWord = text.components(separatedBy: " ").last ?? text
-        guard !Abbreviation.isAbbreviation(finalWord) else { return text }
+        guard let last = text.last, last == "." || last == "!" else { return text }
+        if last == "." {
+            let finalWord = text.components(separatedBy: " ").last ?? text
+            guard !Abbreviation.isAbbreviation(finalWord) else { return text }
+        }
         return String(text.dropLast())
     }
 

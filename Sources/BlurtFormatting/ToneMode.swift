@@ -77,6 +77,8 @@ public enum CleanupInstructions {
             - Remove filler words (um, uh, like, you know) and false starts.
             - Fix punctuation, capitalization, and paragraph breaks.
             - Turn clearly spoken lists into formatted lists.
+            - Write numbers as digits where a person writing this would: "twenty twenty \
+            six" is 2026, "forty two" is 42. Leave small numbers as words in prose.
             - Apply the speaker's self-corrections. "Send it Tuesday, actually Wednesday" \
             becomes "Send it Wednesday."
             - \(tone.instruction)
