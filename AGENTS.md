@@ -148,6 +148,15 @@ Settings entirely (⌘Q) before reopening; the Privacy pane caches its list.
 
 **`log` may be shadowed in the user's shell.** Use `/usr/bin/log` explicitly.
 
+**TCC answers for the parent process, not for a shell-exec'd child.** Run
+`Blurt --diagnose` from a terminal and `AXIsProcessTrusted()` returns false on a machine
+where Accessibility is granted — TCC attributes the process to the terminal that spawned it.
+Measured both ways: the same binary launched by LaunchServices arms its event tap, while the
+shell-exec'd copy reports the grant missing. `Diagnostics` therefore refuses to report
+permissions unless `getppid() == 1`, and the menu's **Copy Diagnostics** is the path that can
+see them. Don't "fix" this with `open -a Blurt --args --diagnose`: exiting during launch
+breaks the LaunchServices handshake and fails with -600.
+
 **Don't run the `.app` from the repo folder.** It's iCloud-synced and the sync engine can
 corrupt the signature. `make install` puts the running copy in `/Applications`.
 

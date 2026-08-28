@@ -94,6 +94,25 @@ list and will otherwise show the row you just deleted.
 
 Other targets: `make app` (bundle only), `make run` (run in place), `make clean`.
 
+### When something isn't working
+
+```bash
+/Applications/Blurt.app/Contents/MacOS/Blurt --diagnose
+```
+
+Reports the version, whether the on-device model is available and why not, the active
+engine, the push-to-talk binding and which event types its tap requests, and how much of
+your dictionary reached the engine. Exits non-zero when Blurt cannot dictate as configured.
+
+**It cannot report permissions from a terminal, and says so rather than guessing.** TCC
+attributes a directly-exec'd process to its responsible parent — your terminal — and answers
+on that process's behalf, so both grants read as missing however thoroughly they were
+granted. For a report that includes them, use **Copy Diagnostics** in the menu bar item: the
+running app is attributed to itself.
+
+(`open -a Blurt --args --diagnose` is not a workaround. Exiting during launch breaks the
+LaunchServices handshake and it fails with -600.)
+
 ### Sending a build to someone else
 
 ```bash

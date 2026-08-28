@@ -7,6 +7,15 @@ import SwiftUI
 struct BlurtApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
+    /// `--diagnose` prints what Blurt can see about itself and exits without showing a
+    /// window. Handled here rather than in the delegate because
+    /// `applicationDidFinishLaunching` runs after the app has already activated and put a
+    /// window on screen — too late to be a command-line tool.
+    init() {
+        guard CommandLine.arguments.contains("--diagnose") else { return }
+        exit(Diagnostics.run())
+    }
+
     var body: some Scene {
         // The main window. A `Window` rather than a `WindowGroup`: this app has one front
         // panel, and letting ⌘N spawn a second copy of a tape deck makes no sense.
@@ -267,6 +276,10 @@ private struct MenuContent: View {
         if !permissions.microphone {
             Button("Grant Microphone…") { Permissions.openMicrophoneSettings() }
         }
+
+        // The only place permissions can be reported truthfully: the running app is
+        // attributed to itself, where a terminal-launched copy is attributed to the terminal.
+        Button("Copy Diagnostics") { Diagnostics.copyToPasteboard() }
 
         Button("Run Setup Again…") {
             OnboardingModel.restart()
