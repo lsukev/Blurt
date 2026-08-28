@@ -32,7 +32,22 @@ ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -
 endif
 
-.PHONY: all build app run install clean icon
+.PHONY: all build app run install clean icon notarize
+
+## Timestamping is a network round-trip to Apple's timestamp server, which is wasted time
+## on every local build — but notarization *requires* a secure timestamp, so the notarize
+## target turns it back on rather than everyone paying for it always.
+TIMESTAMP ?= --timestamp=none
+
+## The keychain profile holding the notarization credential. Created once, by hand:
+##
+##   xcrun notarytool store-credentials blurt-notary \
+##     --apple-id <your-apple-id> --team-id $(TEAM_ID) --password <app-specific-password>
+##
+## The credential lives in the keychain, never in this file.
+NOTARY_PROFILE ?= blurt-notary
+TEAM_ID        := 38ZD3H23A8
+DIST           := dist
 
 all: app
 
@@ -61,7 +76,7 @@ app: build
 	@codesign --force --sign "$(SIGN_ID)" \
 		--entitlements Resources/$(EXEC).entitlements \
 		--options runtime \
-		--timestamp=none \
+		$(TIMESTAMP) \
 		"$(BUNDLE)"
 	@echo "built $(BUNDLE)  [signed: $(SIGN_ID)]"
 
@@ -80,6 +95,29 @@ install: app
 	@cp -R "$(BUNDLE)" "/Applications/$(APPNAME)"
 	@open "/Applications/$(APPNAME)"
 	@echo "installed to /Applications/$(APPNAME)"
+
+## Notarize a release build and staple Apple's ticket to it.
+##
+## Stapling attaches the ticket to the .app itself, so it launches on a machine that is
+## offline or has never seen the app before. A zip cannot be stapled — it's only transport,
+## which is why it's rebuilt from the stapled bundle afterwards rather than reused.
+##
+## Signing here must use a secure timestamp, hence the TIMESTAMP override; without it the
+## submission is rejected before Apple even looks at the binary.
+notarize:
+	@$(MAKE) --no-print-directory app CONFIG=release TIMESTAMP=--timestamp
+	@mkdir -p "$(DIST)"
+	@rm -f "$(DIST)/$(EXEC)-submit.zip" "$(DIST)/$(EXEC).zip"
+	@ditto -c -k --sequesterRsrc --keepParent "$(BUNDLE)" "$(DIST)/$(EXEC)-submit.zip"
+	@echo "submitting to Apple — this usually takes a few minutes"
+	@xcrun notarytool submit "$(DIST)/$(EXEC)-submit.zip" \
+		--keychain-profile "$(NOTARY_PROFILE)" --wait
+	@xcrun stapler staple "$(BUNDLE)"
+	@rm -f "$(DIST)/$(EXEC)-submit.zip"
+	@ditto -c -k --sequesterRsrc --keepParent "$(BUNDLE)" "$(DIST)/$(EXEC).zip"
+	@echo "--- gatekeeper ---"
+	@spctl -a -vvv -t exec "$(BUNDLE)" || true
+	@echo "stapled: $(DIST)/$(EXEC).zip"
 
 clean:
 	@rm -rf .build "$(STAGE)" "$(SCRATCH)"

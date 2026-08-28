@@ -81,6 +81,34 @@ list and will otherwise show the row you just deleted.
 
 Other targets: `make app` (bundle only), `make run` (run in place), `make clean`.
 
+### Sending a build to someone else
+
+```bash
+make notarize
+```
+
+Builds release, submits to Apple, staples the ticket onto the `.app`, and writes
+`dist/Blurt.zip`. The recipient unzips, drags to `/Applications`, and double-clicks —
+nothing to right-click through.
+
+Two details that are easy to get wrong and silently break it:
+
+- **Notarization requires a secure timestamp**, and the ordinary build path deliberately
+  passes `--timestamp=none` because timestamping is a network round-trip nobody wants on
+  every local build. `make notarize` overrides `TIMESTAMP` for exactly this reason; a
+  submission signed without one is rejected before Apple looks at the binary.
+- **You staple the `.app`, never the zip.** The zip is only transport, which is why the
+  target re-creates it from the stapled bundle rather than reusing the one it submitted.
+
+The credential is set up once and lives in the keychain, never in this repo:
+
+```bash
+xcrun notarytool store-credentials blurt-notary   # prompts for everything
+```
+
+An App Store Connect API key (`--key`/`--key-id`/`--issuer`) works here too, and avoids
+app-specific passwords entirely.
+
 ---
 
 ## Architecture
@@ -184,13 +212,10 @@ change.
 
 1. **Command Mode.** Select text, hold a second hotkey, say "make this more formal."
    Needs AX read of `kAXSelectedTextAttribute` plus an LLM round-trip.
-2. **Notarization.** The app signs with a Developer ID, which is what keeps TCC grants
-   sticky across rebuilds — but it is not notarized, so a copy handed to anyone else is
-   refused by Gatekeeper on first launch until they right-click ▸ Open. This is the one
-   thing standing between the current build and something you can simply send someone.
-3. **A Windows installer**, and model download from inside the app rather than by
-   following `docs/PARAKEET-WINDOWS.md` by hand.
-4. **Windows on real hardware.** Every layer exists and CI exercises it, but nobody has
+2. **A Windows installer**, code signing for it, and model download from inside the app
+   rather than by following `docs/PARAKEET-WINDOWS.md` by hand. Windows users meet
+   SmartScreen until that's signed.
+3. **Windows on real hardware.** Every layer exists and CI exercises it, but nobody has
    yet held the key and spoken into a microphone. Start with `--selftest`.
 
 ---

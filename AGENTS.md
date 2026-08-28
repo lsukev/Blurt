@@ -197,10 +197,11 @@ lookahead, `\p{L}`, and `$1`–`$9` in replacements. Nothing else.
 ## What isn't built
 
 1. **Command Mode** — select text, hold a second key, "make this more formal."
-2. **Notarization** (macOS) and **code signing** (Windows). macOS signs with a Developer ID
-   — which is what keeps TCC grants sticky — but does not notarize, so a build handed to
-   anyone else is refused by Gatekeeper until they right-click ▸ Open. Windows users meet
-   SmartScreen.
+2. **Code signing on Windows.** Windows users meet SmartScreen. macOS is done: `make
+   notarize` signs with a Developer ID, submits, and staples, so a handed-over build opens
+   normally. Two traps live in that target and are commented there — notarization needs a
+   secure timestamp, which the ordinary build path deliberately omits, and you staple the
+   `.app` rather than the zip.
 4. **An installer** for Windows, and model download from inside the app rather than by
    following `docs/PARAKEET-WINDOWS.md` by hand.
 
