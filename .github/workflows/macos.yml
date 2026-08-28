@@ -18,7 +18,7 @@ permissions:
 jobs:
   dictionary-contract:
     name: Dictionary contract
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 20
 
     steps:
@@ -36,9 +36,16 @@ jobs:
       - name: Swift version
         run: swift --version
 
-      # The app target needs macOS 26 and the Speech framework, which the runner image
-      # does not have. BlurtDictionary, BlurtSetup and BlurtInput are all deliberately
-      # platform-neutral, so they build and test anywhere.
+      # The runner must be macOS 26, not just any macOS. Package.swift declares
+      # .macOS(.v26), so the test bundle is built for 26 — and an older runner cannot
+      # dlopen it the moment the code touches a symbol the newer Swift runtime introduced.
+      # That failed as "Symbol not found: EnumeratedSequence ... built for macOS 26.0 which
+      # is newer than running OS", which reads like a code error and is an image mismatch.
+      # It was latent until something used `.enumerated()`.
+      #
+      # The app target itself also needs macOS 26 and the Speech framework. BlurtDictionary,
+      # BlurtSetup, BlurtInput and BlurtFormatting are platform-neutral in the sense that
+      # they need no Speech or AppKit — not in the sense that they run on an older OS.
       #
       # Filtered by MODULE, not by suite name: a suite-name list silently stops covering a
       # new suite the moment someone adds one, and the run still goes green.
