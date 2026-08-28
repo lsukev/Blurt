@@ -1,0 +1,78 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "title": "1 · Welcome",
+      "x": 0,
+      "y": 0,
+      "w": 860,
+      "h": 620
+    },
+    {
+      "file": "Accessibility.dc.html",
+      "title": "2 · Accessibility",
+      "x": 940,
+      "y": 0,
+      "w": 860,
+      "h": 620
+    },
+    {
+      "file": "Microphone.dc.html",
+      "title": "3 · Microphone",
+      "x": 1880,
+      "y": 0,
+      "w": 860,
+      "h": 620
+    },
+    {
+      "file": "Key.dc.html",
+      "title": "4 · Key",
+      "x": 0,
+      "y": 740,
+      "w": 860,
+      "h": 620
+    },
+    {
+      "file": "TryIt.dc.html",
+      "title": "5 · Try it",
+      "x": 940,
+      "y": 740,
+      "w": 860,
+      "h": 620
+    },
+    {
+      "file": "Done.dc.html",
+      "title": "6 · Done",
+      "x": 1880,
+      "y": 740,
+      "w": 860,
+      "h": 620
+    }
+  ],
+  "annotations": [
+    {
+      "id": "rail-note",
+      "x": 0,
+      "y": -150,
+      "w": 420,
+      "text": "The rail is the wizard's only navigation — a lamp per step, lit as you clear it.\nNo Next/Back chrome: granting a permission advances the page on its own."
+    },
+    {
+      "id": "lamp-note",
+      "x": 1880,
+      "y": -150,
+      "w": 400,
+      "text": "Lit lamps are cream, not green.\nAGENTS.md reserves red for recording and amber/green for level instrumentation, so \"granted\" can't use the obvious colour."
+    },
+    {
+      "id": "hard-note",
+      "x": 940,
+      "y": 1400,
+      "w": 420,
+      "text": "Steps 2 and 5 carry the real weight — 2 is where people get stuck (the wedged-TCC recovery lives there), and 5 exercises the one path CI can never reach."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

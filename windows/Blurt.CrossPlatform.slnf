@@ -1,0 +1,16 @@
+{
+  "solution": {
+    "path": "Blurt.sln",
+    "projects": [
+      "src\\Blurt.Abstractions\\Blurt.Abstractions.csproj",
+      "src\\Blurt.App\\Blurt.App.csproj",
+      "src\\Blurt.Core\\Blurt.Core.csproj",
+      "src\\Blurt.Dictionary\\Blurt.Dictionary.csproj",
+      "src\\Blurt.Speech\\Blurt.Speech.csproj",
+      "src\\Blurt.Testing\\Blurt.Testing.csproj",
+      "tests\\Blurt.App.Tests\\Blurt.App.Tests.csproj",
+      "tests\\Blurt.Core.Tests\\Blurt.Core.Tests.csproj",
+      "tests\\Blurt.Dictionary.Tests\\Blurt.Dictionary.Tests.csproj"
+    ]
+  }
+}

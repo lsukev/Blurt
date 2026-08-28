@@ -39,30 +39,38 @@ of them can be exercised by hand.
 
 ```bash
 swift test --filter VectorTests                    # macOS side
-cd windows && dotnet test Murmur.CrossPlatform.slnf # Windows side, runs anywhere
+cd windows && dotnet test Blurt.CrossPlatform.slnf # Windows side, runs anywhere
 ```
 
-The Swift copy at `Tests/MurmurDictionaryTests/dictionary-test-vectors.json` is a copy, and
+There is a second platform-neutral target with the same shape: `BlurtSetup` holds the
+first-run flow's *decisions* — step order, which lamps are lit, when the wedged-TCC reset is
+worth offering — precisely so they can be tested without macOS 26, a microphone or a TCC
+database. `swift test --filter SetupFlowTests`. The side effects live in `OnboardingModel`
+in the app target and are not testable; keep the seam where it is.
+
+The Swift copy at `Tests/BlurtDictionaryTests/dictionary-test-vectors.json` is a copy, and
 CI fails if it drifts from `shared/`. After editing the shared file:
 
 ```bash
-cp shared/dictionary-test-vectors.json Tests/MurmurDictionaryTests/
+cp shared/dictionary-test-vectors.json Tests/BlurtDictionaryTests/
 ```
 
 ---
 
 ## Things that look like bugs and are not
 
-**`dotnet build Murmur.sln` fails on macOS** with `NETSDK1073`. Expected —
-`Murmur.Platform.Windows` targets `net10.0-windows`. Use `Murmur.CrossPlatform.slnf`, which
+**`dotnet build Blurt.sln` fails on macOS** with `NETSDK1073`. Expected —
+`Blurt.Platform.Windows` targets `net10.0-windows`. Use `Blurt.CrossPlatform.slnf`, which
 omits it; everything else, including the whole UI suite, builds and tests on macOS in about
 half a second.
 
-**`swift build` fails with "input file was modified during the build."** The repo lives in an
-iCloud-synced folder and the sync engine touches files mid-compile. **Always build with
-`make`**, which uses `--scratch-path` outside the synced tree. A bare `swift build` also
-writes a `.build/` directory into iCloud, which makes every subsequent build minutes slower.
-If you see this error, wait a few seconds and retry.
+**`swift build` fails with "input file was modified during the build."** This happens when
+the checkout sits in a file-provider-synced folder (iCloud Desktop & Documents, Dropbox) and
+the sync engine touches files mid-compile. It is not universal — check before repeating it
+as fact about a given machine. **Always build with `make`** regardless: it uses
+`--scratch-path` under `~/Library/Caches`, which is never synced, so the race cannot happen
+and no `.build/` lands next to the source. If you see this error, wait a few seconds and
+retry.
 
 **Compare mode doesn't type anything.** By design — `Settings.compareMode` runs every engine
 on one recording and shows them side by side. If both injected, two transcripts would fight
@@ -85,7 +93,7 @@ invisible to SwiftUI's state graph. Don't "clean that up" into `@State`.
 
 ## Design system
 
-`Sources/MurmurYouTube/UI/DesignSystem.swift` defines every colour, size, radius, duration
+`Sources/Blurt/UI/DesignSystem.swift` defines every colour, size, radius, duration
 and material token. **Views must not contain literal values.** If a component needs a number
 that isn't a token, add the token rather than inlining it.
 
@@ -94,6 +102,10 @@ face in light appearance, black face in dark. Two rules that are not negotiable:
 
 - **Red means recording.** Nothing else in the app is red.
 - **Amber and green are instrumentation only** — level meters, never UI chrome.
+
+A consequence worth stating, because it catches people: a "granted"/"done" indicator cannot
+be green, which is the colour every other app reaches for. Use `DS.Color.statusLamp` — warm
+white, which is what function lamps on the actual hardware were.
 
 Explicitly ruled out: neon, vaporwave, synthwave, purple/pink gradients, glowing text, chrome
 lettering, grid horizons. There are **no gradients anywhere**; depth comes from flat panels,
@@ -112,7 +124,7 @@ shows as **on** while the app is untrusted. The `Makefile` auto-detects a Develo
 If a grant does get wedged, reset that one row — never toggle, and never omit the bundle ID:
 
 ```bash
-tccutil reset Accessibility ai.pivotstudio.murmur-youtube
+tccutil reset Accessibility com.lsukev.blurt
 ```
 
 A bare `tccutil reset Accessibility` wipes every app on the machine. Then quit System
@@ -147,7 +159,7 @@ key-down is swallowed and the key-up escapes, the target app believes Ctrl is he
 `ValuePattern` replaces a whole field rather than inserting at the caret. `SendInput` is the
 primary path, not a fallback.
 
-**`Murmur.App` loads the platform layer by reflection, not by reference.** A direct
+**`Blurt.App` loads the platform layer by reflection, not by reference.** A direct
 reference would force the UI onto `net10.0-windows` and you would lose the ability to run it
 on your own machine. Two consequences that have already bitten once: the assembly is
 invisible to `PublishSingleFile`, so it is published as a loose file beside the exe *and*
@@ -155,7 +167,7 @@ resolved by an explicit `AssemblyLoadContext` handler; and the published self-te
 this, because when it breaks the app starts perfectly and then does nothing at all when the
 key is pressed.
 
-**Keep `Murmur.Platform.Windows` logic-free.** Anything living there is code CI cannot
+**Keep `Blurt.Platform.Windows` logic-free.** Anything living there is code CI cannot
 exercise. Retries, debouncing and device-change handling belong in the platform-neutral
 projects behind an interface — those target plain `net10.0`, so `CA1416` turns any accidental
 Win32 call into a build error.
@@ -185,9 +197,11 @@ lookahead, `\p{L}`, and `$1`–`$9` in replacements. Nothing else.
 ## What isn't built
 
 1. **Command Mode** — select text, hold a second key, "make this more formal."
-2. **Onboarding** — a first-run window walking through the macOS permissions.
-3. **Notarization** (macOS) and **code signing** (Windows). Both apps are unsigned for
-   distribution, so Windows users will meet SmartScreen.
+2. **Code signing on Windows.** Windows users meet SmartScreen. macOS is done: `make
+   notarize` signs with a Developer ID, submits, and staples, so a handed-over build opens
+   normally. Two traps live in that target and are commented there — notarization needs a
+   secure timestamp, which the ordinary build path deliberately omits, and you staple the
+   `.app` rather than the zip.
 4. **An installer** for Windows, and model download from inside the app rather than by
    following `docs/PARAKEET-WINDOWS.md` by hand.
 

@@ -1,10 +1,12 @@
-# Murmur YouTube
+# Blurt
 
 Push-to-talk dictation for macOS. Hold a key, talk, release — cleaned-up text lands in
 whatever text field has focus. A Wispr Flow-shaped app, built native and fully on-device.
 
-**Status:** working skeleton. Builds, launches, arms the hotkey, transcribes, injects.
-Branding and the LLM cleanup tier are the next passes.
+**Status:** working, and in daily use on macOS. Builds, launches, arms the hotkey,
+transcribes, cleans up and injects, with a first-run setup flow, a personal dictionary and
+an on-device LLM cleanup tier. A Windows port lives in `windows/` — complete, CI-verified,
+and never yet run on real hardware.
 
 ---
 
@@ -13,10 +15,10 @@ Branding and the LLM cleanup tier are the next passes.
 This app is built to run alongside other dictation tools without colliding with them, which
 is not automatic on macOS and is worth understanding before changing anything:
 
-- **Bundle ID `ai.pivotstudio.murmur-youtube`** — TCC keys Accessibility and Microphone
+- **Bundle ID `com.lsukev.blurt`** — TCC keys Accessibility and Microphone
   grants to the bundle ID, so granting or revoking a permission here has no effect on any
   other app, and vice versa.
-- **Executable `MurmurYouTube`** — distinct enough that `pkill -x MurmurYouTube` cannot
+- **Executable `Blurt`** — distinct enough that `pkill -x Blurt` cannot
   match a differently-named binary. The `Makefile` only ever targets `$(EXEC)`.
 - **Hotkey is configurable** (Right ⌥ / fn / Right ⌘) precisely because another tool may
   already own the key you'd reach for first. The event tap inspects only its own keycode
@@ -33,14 +35,21 @@ the same key both record, and whichever injects text will fight the other.
 make install     # builds, bundles, signs, copies to /Applications, launches
 ```
 
-Then grant two permissions — neither is optional, and neither can be requested silently:
+On a first run Blurt opens its setup flow, which walks you through both permissions, lets
+you pick a push-to-talk key, and finishes with a rehearsal so you can confirm the whole
+chain works before you rely on it. You can reach it again any time from the menu bar item's
+**Run Setup Again…**.
+
+If you'd rather do it by hand, there are two permissions — neither is optional, and neither
+can be requested silently:
 
 | Permission | Where | Needed for |
 |---|---|---|
 | **Accessibility** | System Settings ▸ Privacy & Security ▸ Accessibility | The `CGEventTap` that sees the hotkey, and the AX text insert |
 | **Microphone** | Prompted on first dictation | Audio capture |
 
-Restart Murmur YouTube after granting Accessibility. Then hold **Right ⌥** and talk.
+Blurt arms the hotkey the moment Accessibility lands — no restart needed. Then hold
+**Right ⌥** and talk.
 
 ### Why grants survive rebuilds here
 
@@ -56,19 +65,49 @@ grants with no re-prompt.
 If a grant ever does get wedged, reset that one row and re-add — never toggle:
 
 ```bash
-tccutil reset Accessibility ai.pivotstudio.murmur-youtube
-tccutil reset Microphone   ai.pivotstudio.murmur-youtube
+tccutil reset Accessibility com.lsukev.blurt
+tccutil reset Microphone   com.lsukev.blurt
 ```
 
 Always pass the bundle ID. A bare `tccutil reset Accessibility` wipes **every** app on the
 machine. Then quit System Settings entirely (⌘Q) before reopening — that pane caches its
 list and will otherwise show the row you just deleted.
 
-> **Keep the build out of iCloud.** `~/Desktop` and `~/Documents` are file-provider synced
-> on this machine; the sync engine can materialize/dematerialize files inside an `.app` and
-> corrupt its signature. `make install` puts the running copy in `/Applications`.
+> **Keep the build out of iCloud.** If `~/Desktop` or `~/Documents` is file-provider synced
+> on your machine, the sync engine can materialize/dematerialize files inside an `.app` and
+> corrupt its signature. The `Makefile` therefore builds and stages under
+> `~/Library/Caches`, which is never synced, and `make install` puts the running copy in
+> `/Applications`. Nothing lands in the repo folder.
 
 Other targets: `make app` (bundle only), `make run` (run in place), `make clean`.
+
+### Sending a build to someone else
+
+```bash
+make notarize
+```
+
+Builds release, submits to Apple, staples the ticket onto the `.app`, and writes
+`dist/Blurt.zip`. The recipient unzips, drags to `/Applications`, and double-clicks —
+nothing to right-click through.
+
+Two details that are easy to get wrong and silently break it:
+
+- **Notarization requires a secure timestamp**, and the ordinary build path deliberately
+  passes `--timestamp=none` because timestamping is a network round-trip nobody wants on
+  every local build. `make notarize` overrides `TIMESTAMP` for exactly this reason; a
+  submission signed without one is rejected before Apple looks at the binary.
+- **You staple the `.app`, never the zip.** The zip is only transport, which is why the
+  target re-creates it from the stapled bundle rather than reusing the one it submitted.
+
+The credential is set up once and lives in the keychain, never in this repo:
+
+```bash
+xcrun notarytool store-credentials blurt-notary   # prompts for everything
+```
+
+An App Store Connect API key (`--key`/`--key-id`/`--issuer`) works here too, and avoids
+app-specific passwords entirely.
 
 ---
 
@@ -116,8 +155,8 @@ two components most likely to change can change without touching anything else.
 ### Layout
 
 ```
-Sources/MurmurYouTube/
-├── MurmurYouTubeApp.swift              @main, AppDelegate, MenuBarExtra
+Sources/Blurt/
+├── BlurtApp.swift              @main, AppDelegate, MenuBarExtra
 ├── Core/
 │   ├── DictationController.swift   state machine, wires everything
 │   ├── HotkeyMonitor.swift         CGEventTap on .flagsChanged
@@ -128,11 +167,21 @@ Sources/MurmurYouTube/
 │   └── AppleSpeechEngine.swift     SpeechAnalyzer / SpeechTranscriber
 ├── Formatting/
 │   └── TextFormatter.swift         protocol + RuleBasedFormatter
+├── Onboarding/
+│   ├── OnboardingModel.swift       side effects: prompts, tccutil, relaunch
+│   ├── OnboardingView.swift        the lamp rail and the stage
+│   ├── OnboardingSteps.swift       welcome / accessibility / microphone / key / done
+│   └── TryItStep.swift             the rehearsal, through the real injector
 ├── UI/
+│   ├── DesignSystem.swift          every colour, size, radius and duration
+│   ├── Equipment.swift             panels, wells, keys, lamps, meters
 │   ├── HUDPanel.swift              non-activating floating panel
-│   └── HUDView.swift               waveform + live transcript, Brand palette
+│   └── HUDView.swift               waveform + live transcript
 └── Support/
-    ├── Settings.swift, Permissions.swift, Log.swift
+    ├── Settings.swift, Permissions.swift, PermissionMonitor.swift, Log.swift
+
+Sources/BlurtDictionary/    correction rules — cross-platform contract, tested
+Sources/BlurtSetup/         setup flow decisions — platform-neutral, tested
 ```
 
 ---
@@ -161,41 +210,38 @@ change.
 
 ## Not built yet
 
-1. **LLM cleanup tier.** `RuleBasedFormatter` strips fillers, fixes spacing, capitalizes
-   sentences and adds terminal punctuation — genuinely useful, entirely deterministic. The
-   real win is a second `TextFormatter` backed by Apple's on-device Foundation Models
-   (macOS 26) for tone, list formatting, and honoring spoken corrections, with Claude as an
-   optional higher-quality tier.
-2. **Command Mode.** Select text, hold a second hotkey, say "make this more formal."
+1. **Command Mode.** Select text, hold a second hotkey, say "make this more formal."
    Needs AX read of `kAXSelectedTextAttribute` plus an LLM round-trip.
-3. **Personal dictionary.** Names and jargon the ASR keeps missing. `SpeechAnalyzer`
-   supports this through `AnalysisContext` / `SFCustomLanguageModelData`.
-4. **Branding.** `Brand` in `HUDView.swift` is a two-color placeholder gradient. App icon,
-   real palette, HUD motion design, onboarding.
-5. **Onboarding.** A first-run window that walks through both permissions instead of
-   relying on the menu's "Grant…" items.
-6. **Developer ID signing + notarization.** Ends the TCC-reset churn and makes the app
-   distributable.
+2. **A Windows installer**, code signing for it, and model download from inside the app
+   rather than by following `docs/PARAKEET-WINDOWS.md` by hand. Windows users meet
+   SmartScreen until that's signed.
+3. **Windows on real hardware.** Every layer exists and CI exercises it, but nobody has
+   yet held the key and spoken into a microphone. Start with `--selftest`.
 
 ---
 
 ## Verified
 
-Driven with a synthetic Right ⌥ hold (`scratchpad/ptt/ptt2.swift` posts `flagsChanged`
-events) and confirmed via `/usr/bin/log show --predicate 'subsystem ==
-"ai.pivotstudio.murmur-youtube"'`:
+Confirmed via `/usr/bin/log show --predicate 'subsystem == "com.lsukev.blurt"'`:
 
-- Builds clean under Swift 6 strict concurrency.
-- Signs with Developer ID; grants survive rebuild + reinstall.
-- Launches as an accessory app, no Dock icon, menu bar item present.
-- Event tap arms on grant without a restart (the poller catches it).
+- Builds clean under Swift 6 strict concurrency; 14 tests across two platform-neutral
+  targets pass, and both CI workflows are green.
+- Signs with a Developer ID, so TCC grants survive rebuild + reinstall.
+- Launches as a regular app — Dock icon, app menu, main window — with the menu bar item
+  kept for status and the hotkey while you're working elsewhere.
+- A first run does **not** throw the system Accessibility dialog before the user has seen
+  anything; the setup flow owns that moment. A returning user who lost the grant is still
+  asked outright.
+- `PermissionMonitor` catches the grant while the app is running, and the event tap arms
+  from it without a restart.
 - Full state machine: `starting → listening → finishing → idle`, no errors.
-- `SpeechAnalyzer` starts; models already installed, no download stall.
-- Audio capture runs and converts native 48 kHz → 16 kHz for the engine.
-- HUD renders bottom-center at `{{790, 96}, {340, 76}}` without taking focus.
+- `SpeechAnalyzer` starts, and audio capture converts native 48 kHz → 16 kHz for it.
+- HUD renders bottom-center without taking focus.
 - Silence produces an empty transcript and injects nothing.
 
-**Not yet verified:** speech → transcript → cleanup → injection. Synthetic key events
-can't produce audio, so this needs a human to hold the key and talk.
+**What no automated test can reach:** speech → transcript → cleanup → injection. CI cannot
+speak and cannot hold a key down, which is exactly why the setup flow ends with a rehearsal
+that runs the real path into a real focused field — that step is the only place the whole
+chain gets exercised on a given machine.
 
-> `log` is shadowed in this shell — use `/usr/bin/log` explicitly or it returns nothing.
+> `log` is shadowed in some shells — use `/usr/bin/log` explicitly or it returns nothing.
