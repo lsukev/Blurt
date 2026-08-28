@@ -1,3 +1,4 @@
+import BlurtInput
 import AppKit
 import SwiftUI
 
@@ -95,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         observeState()
-        Log.app.info("Blurt ready — hold \(Settings.shared.pushToTalkKey.displayName) to dictate")
+        Log.app.info("Blurt ready — hold \(Settings.shared.pushToTalkBinding.displayName) to dictate")
     }
 
     /// `blurt://clear` and `blurt://show`, used by the legacy HTML dashboard and
@@ -199,20 +200,15 @@ private struct MenuContent: View {
     }
 
     var body: some View {
-        Text("Hold \(settings.pushToTalkKey.displayName) to dictate")
+        Text("Hold \(settings.pushToTalkBinding.displayName) to dictate")
 
         Divider()
 
-        Picker("Push-to-talk key", selection: Binding(
-            get: { settings.pushToTalkKey },
-            set: { key in
-                settings.pushToTalkKey = key
-                controller.reloadHotkey()
-            }
-        )) {
-            ForEach(PushToTalkKey.allCases, id: \.self) { key in
-                Text(key.displayName).tag(key)
-            }
+        // No Picker here any more: a binding can be any key or mouse button, which is not
+        // an enumerable list. Settings owns the capture UI; this just reports and links.
+        Button("Change push-to-talk key…") {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            NSApp.activate(ignoringOtherApps: true)
         }
 
         Toggle("Compare mode (both engines)", isOn: $settings.compareMode)

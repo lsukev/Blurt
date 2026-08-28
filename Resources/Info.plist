@@ -2,28 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key>
-	<string>Blurt</string>
 	<key>CFBundleDisplayName</key>
 	<string>Blurt</string>
-	<!-- Deliberately space-free and distinctive, so that a `pkill`/`killall` aimed at any
-	     other dictation app can never match this one, and vice versa. -->
 	<key>CFBundleExecutable</key>
 	<string>Blurt</string>
-	<!-- Our own reverse-DNS, deliberately sharing no prefix with any other dictation app:
-	     distinct TCC identity, distinct preferences domain, no shared state of any kind. -->
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.lsukev.blurt</string>
+	<key>CFBundleName</key>
+	<string>Blurt</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
-	<!-- Lets the dashboard's Clear button call back into the app. A file:// page can't
-	     write files or talk to a process, but it can follow a custom-scheme link. -->
+	<string>0.2.0</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -35,10 +27,10 @@
 			</array>
 		</dict>
 	</array>
+	<key>CFBundleVersion</key>
+	<string>2</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
-	<!-- A regular app: dock icon, app menu, standard windows. The menu bar item remains
-	     for status and the hotkey while you're working elsewhere, but it is secondary. -->
 	<key>LSUIElement</key>
 	<false/>
 	<key>NSHighResolutionCapable</key>

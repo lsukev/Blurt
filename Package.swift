@@ -27,11 +27,20 @@ let package = Package(
             path: "Sources/BlurtSetup",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        // What you hold to dictate. Platform-neutral for the same reason as the two above:
+        // naming, suppression policy, storage migration and tap scope are all worth testing,
+        // and the CGEventTap that acts on them cannot be tested at all.
+        .target(
+            name: "BlurtInput",
+            path: "Sources/BlurtInput",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .executableTarget(
             name: "Blurt",
             dependencies: [
                 "BlurtDictionary",
                 "BlurtSetup",
+                "BlurtInput",
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ],
             path: "Sources/Blurt",
@@ -50,6 +59,12 @@ let package = Package(
             name: "BlurtSetupTests",
             dependencies: ["BlurtSetup"],
             path: "Tests/BlurtSetupTests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "BlurtInputTests",
+            dependencies: ["BlurtInput"],
+            path: "Tests/BlurtInputTests",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

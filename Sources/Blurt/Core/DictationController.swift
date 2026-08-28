@@ -88,7 +88,7 @@ final class DictationController {
     /// - Returns: `false` if the hotkey tap couldn't be installed (missing Accessibility).
     @discardableResult
     func activate() -> Bool {
-        hotkey.key = Settings.shared.pushToTalkKey
+        hotkey.binding = Settings.shared.pushToTalkBinding
         hotkey.onPress = { [weak self] in self?.beginDictation() }
         hotkey.onRelease = { [weak self] in self?.endDictation() }
         return hotkey.start()

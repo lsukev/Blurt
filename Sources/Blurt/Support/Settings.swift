@@ -1,3 +1,4 @@
+import BlurtInput
 import Foundation
 import Observation
 
@@ -22,8 +23,9 @@ enum SpeechEngineChoice: String, CaseIterable, Sendable {
 final class Settings {
     static let shared = Settings()
 
-    var pushToTalkKey: PushToTalkKey {
-        didSet { defaults.set(pushToTalkKey.rawValue, forKey: Keys.pushToTalkKey) }
+    /// What you hold to dictate — a modifier, any key, or a mouse button.
+    var pushToTalkBinding: PushToTalkBinding {
+        didSet { defaults.set(pushToTalkBinding.storageValue, forKey: Keys.pushToTalkKey) }
     }
 
     var engine: SpeechEngineChoice {
@@ -74,8 +76,10 @@ final class Settings {
     }
 
     private init() {
-        let raw = defaults.string(forKey: Keys.pushToTalkKey) ?? PushToTalkKey.rightOption.rawValue
-        pushToTalkKey = PushToTalkKey(rawValue: raw) ?? .rightOption
+        // The key stays "pushToTalkKey" so installs from before bindings existed keep their
+        // choice: PushToTalkBinding parses the three bare strings those versions wrote.
+        let raw = defaults.string(forKey: Keys.pushToTalkKey) ?? ""
+        pushToTalkBinding = PushToTalkBinding(storageValue: raw) ?? .default
         // Apple by default: no download, no dependency, live text while speaking.
         engine = SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "") ?? .apple
         cleanupEnabled = defaults.object(forKey: Keys.cleanupEnabled) as? Bool ?? true

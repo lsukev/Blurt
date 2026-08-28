@@ -37,12 +37,13 @@ jobs:
         run: swift --version
 
       # The app target needs macOS 26 and the Speech framework, which the runner image
-      # does not have. BlurtDictionary and BlurtSetup are both deliberately platform-neutral,
-      # so they — and the two contracts that matter here — build and test anywhere. Filtered
-      # by name rather than run wholesale, because an unfiltered `swift test` would drag the
-      # app's own tests in behind them.
+      # does not have. BlurtDictionary, BlurtSetup and BlurtInput are all deliberately
+      # platform-neutral, so they build and test anywhere.
+      #
+      # Filtered by MODULE, not by suite name: a suite-name list silently stops covering a
+      # new suite the moment someone adds one, and the run still goes green.
       - name: Test the platform-neutral targets
-        run: swift test --filter '(VectorTests|SetupFlowTests)'
+        run: swift test --filter '(BlurtDictionaryTests|BlurtSetupTests|BlurtInputTests)'
 
       - name: Confirm the vectors on both sides are identical
         run: |

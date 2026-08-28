@@ -42,6 +42,22 @@ swift test --filter VectorTests                    # macOS side
 cd windows && dotnet test Blurt.CrossPlatform.slnf # Windows side, runs anywhere
 ```
 
+A third, `BlurtInput`, holds what you hold to dictate: naming, the suppression policy,
+storage migration and — importantly — which event types the tap is allowed to ask for.
+`swift test --filter BlurtInputTests`. Three rules there are load-bearing:
+
+- **The tap's event mask is derived from the binding, never fixed.** A session tap that asks
+  for `keyDown` observes every character typed anywhere on the machine. Blurt has no
+  business holding that while it waits on a modifier or a mouse button, so it doesn't ask.
+  Rebinding tears the tap down and builds a new one. Don't "simplify" this to one mask.
+- **Left and right click are unrepresentable, not rejected.** `mouseButton(_:)` returns nil
+  below button 2 and the tap only ever requests `otherMouse` events, so binding left-click
+  is impossible by construction. Keep it that way rather than adding a check.
+- **A swallowed key must be swallowed on both edges.** Consume the down and let the up
+  escape and the target app believes the key is held forever — the same failure the Windows
+  hook section describes. `transition(to:)` returns the same answer for both edges on
+  purpose.
+
 There is a second platform-neutral target with the same shape: `BlurtSetup` holds the
 first-run flow's *decisions* — step order, which lamps are lit, when the wedged-TCC reset is
 worth offering — precisely so they can be tested without macOS 26, a microphone or a TCC

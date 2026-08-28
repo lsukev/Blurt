@@ -1,3 +1,4 @@
+import BlurtInput
 import SwiftUI
 
 // The individual setup steps. Each owns its stage content only — the chassis, rail and step
@@ -344,12 +345,7 @@ struct KeyStep: View {
                     + "already wants."
             )
 
-            HStack(spacing: DS.Space.roomy) {
-                ForEach(PushToTalkKey.allCases, id: \.self) { candidate in
-                    option(candidate)
-                }
-                Spacer(minLength: 0)
-            }
+            BindingPicker(controller: controller)
 
             DeckWindow {
                 HStack(spacing: DS.Space.roomy) {
@@ -361,7 +357,7 @@ struct KeyStep: View {
                             text: controller.state.isActive ? "Holding — Blurt sees it" : "Hold your key to test it",
                             color: DS.Color.inkOnDeck.opacity(0.75)
                         )
-                        Text(settings.pushToTalkKey.displayName)
+                        Text(settings.pushToTalkBinding.displayName)
                             .font(DS.Font.counter)
                             .foregroundStyle(DS.Color.inkOnDeck)
                     }
@@ -389,37 +385,6 @@ struct KeyStep: View {
         }
     }
 
-    private func option(_ candidate: PushToTalkKey) -> some View {
-        let isSelected = settings.pushToTalkKey == candidate
-        return VStack(spacing: DS.Space.snug) {
-            Lamp(color: DS.Color.statusLamp, isLit: isSelected)
-            Button {
-                settings.pushToTalkKey = candidate
-                controller.reloadHotkey()
-            } label: {
-                KeyCap(glyph: candidate.capGlyph, width: 118, height: 56)
-                    .overlay {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: DS.Radius.control)
-                                .strokeBorder(DS.Color.selectionEdge, lineWidth: DS.Border.bevel)
-                        }
-                    }
-            }
-            .buttonStyle(.plain)
-            Silkscreen(text: candidate.displayName)
-        }
-    }
-}
-
-private extension PushToTalkKey {
-    /// What's printed on the cap, as opposed to the sentence-shaped `displayName`.
-    var capGlyph: String {
-        switch self {
-        case .rightOption: "⌥"
-        case .fn: "fn"
-        case .rightCommand: "⌘"
-        }
-    }
 }
 
 // MARK: - 6 · Done
@@ -433,16 +398,16 @@ struct DoneStep: View {
         VStack(alignment: .leading, spacing: DS.Space.roomy) {
             StepHeader(
                 title: "You're set.",
-                detail: "Hold \(settings.pushToTalkKey.displayName) anywhere on your Mac and talk. "
+                detail: "Hold \(settings.pushToTalkBinding.displayName) anywhere on your Mac and talk. "
                     + "Blurt types into whatever has focus — a search field, a chat box, an editor."
             )
 
             DeckWindow {
                 HStack(spacing: DS.Space.roomy) {
-                    KeyCap(glyph: settings.pushToTalkKey.capGlyph, width: 96, height: 48)
+                    KeyCap(glyph: settings.pushToTalkBinding.displayName, width: 120, height: 48)
                     VStack(alignment: .leading, spacing: DS.Space.hair) {
                         Silkscreen(text: "Your key", color: DS.Color.inkOnDeck.opacity(0.6))
-                        Text("\(settings.pushToTalkKey.displayName) — hold to dictate")
+                        Text("\(settings.pushToTalkBinding.displayName) — hold to dictate")
                             .font(DS.Font.body)
                             .foregroundStyle(DS.Color.inkOnDeck)
                     }

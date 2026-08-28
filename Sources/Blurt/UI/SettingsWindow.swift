@@ -1,3 +1,4 @@
+import BlurtInput
 import SwiftUI
 
 /// Settings — hotkey and model, per the brief. Opens on ⌘, via the standard `Settings` scene,
@@ -12,26 +13,7 @@ struct SettingsWindow: View {
 
             VStack(alignment: .leading, spacing: DS.Space.wide) {
                 panel(label: "Push to talk") {
-                    HStack(spacing: DS.Space.snug) {
-                        ForEach(PushToTalkKey.allCases, id: \.self) { key in
-                            TransportKey(
-                                title: key.displayName,
-                                isEngaged: settings.pushToTalkKey == key,
-                                engagedColor: DS.Color.ink
-                            ) {
-                                settings.pushToTalkKey = key
-                                controller.reloadHotkey()
-                            }
-                            .background {
-                                if settings.pushToTalkKey == key {
-                                    RoundedRectangle(cornerRadius: DS.Radius.control)
-                                        .fill(DS.Color.selection)
-                                }
-                            }
-                        }
-                    }
-                    note("Hold this key anywhere to dictate. The window's Record button works "
-                        + "regardless of what's focused.")
+                    BindingPicker(controller: controller)
                 }
 
                 panel(label: "Model") {

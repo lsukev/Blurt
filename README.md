@@ -51,6 +51,19 @@ can be requested silently:
 Blurt arms the hotkey the moment Accessibility lands — no restart needed. Then hold
 **Right ⌥** and talk.
 
+### Choosing what you hold
+
+Any modifier, any key, or any mouse button from the third onwards. Setup offers the four
+that are actually good at this — Right ⌥, Right ⌘, fn, Right ⌃ — and "Press any key…"
+captures whatever you press next, including F13–F20 and side buttons on a mouse.
+
+Two things the picker will tell you, and they are worth reading. Binding an ordinary key
+means Blurt **swallows it system-wide** while running: bind `Q` and you cannot type Q
+anywhere. Binding Shift or Control breaks the shortcuts that use them. F13–F20 and
+right-hand modifiers cost you nothing, which is why they are the presets.
+
+Left and right mouse buttons are not bindable, by construction rather than by a check.
+
 ### Why grants survive rebuilds here
 
 TCC stores a *code-signing requirement* per entry, not just a path. An ad-hoc signature
@@ -182,6 +195,7 @@ Sources/Blurt/
 
 Sources/BlurtDictionary/    correction rules — cross-platform contract, tested
 Sources/BlurtSetup/         setup flow decisions — platform-neutral, tested
+Sources/BlurtInput/         push-to-talk bindings — naming, suppression, tap scope, tested
 ```
 
 ---

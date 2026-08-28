@@ -1,63 +1,25 @@
-import AppKit
-import Carbon.HIToolbox
+import BlurtInput
+import CoreGraphics
 import Foundation
 
-/// Which modifier key holds the mic open.
-enum PushToTalkKey: String, CaseIterable, Sendable {
-    case rightOption
-    case fn
-    case rightCommand
-
-    var keyCode: Int64 {
-        switch self {
-        case .rightOption: Int64(kVK_RightOption)   // 61
-        case .fn: Int64(kVK_Function)               // 63
-        case .rightCommand: Int64(kVK_RightCommand) // 54
-        }
-    }
-
-    /// Device-*dependent* bit for this specific physical key.
-    ///
-    /// `CGEventFlags.maskAlternate` is the union mask — it's set whenever *either* Option
-    /// key is down. Using it means: hold Left ⌥, tap Right ⌥, and the release is invisible
-    /// (the union bit is still set by the left key), so `onRelease` never fires. The mic
-    /// stays open, the HUD stays up, and the next press is swallowed too.
-    ///
-    /// These raw values are the NX_DEVICE* masks from IOKit's event system; they carry the
-    /// left/right distinction that the public `CGEventFlags` constants discard.
-    var flag: CGEventFlags {
-        switch self {
-        case .rightOption: CGEventFlags(rawValue: 0x40)   // NX_DEVICERALTKEYMASK
-        case .rightCommand: CGEventFlags(rawValue: 0x10)  // NX_DEVICERCMDKEYMASK
-        case .fn: .maskSecondaryFn                        // no left/right variant exists
-        }
-    }
-
-    var displayName: String {
-        switch self {
-        case .rightOption: "Right ⌥"
-        case .fn: "fn"
-        case .rightCommand: "Right ⌘"
-        }
-    }
-
-    /// Swallowing `fn` would break fn+arrow, fn+delete and the emoji picker, so we let it
-    /// through. Dedicated right-hand modifiers are safe to consume.
-    var shouldConsumeEvent: Bool { self != .fn }
-}
-
-/// Watches for a held modifier key using a `CGEventTap`.
+/// Watches for a held key, modifier or mouse button using a `CGEventTap`.
 ///
 /// A tap is required rather than `NSEvent.addGlobalMonitor` because `fn` and left/right
 /// modifier discrimination don't surface through the higher-level APIs. This needs
 /// Accessibility permission; without it `CGEvent.tapCreate` returns nil.
+///
+/// The event mask is built from the current binding rather than fixed, and that is a
+/// privacy decision as much as a technical one: a session tap that asks for `keyDown` can
+/// observe every character typed anywhere on the machine. Blurt has no business holding
+/// that reach while it is waiting on a modifier or a mouse button, so it doesn't ask for it
+/// — `reload(binding:)` tears the tap down and builds a narrower or wider one to match.
 @MainActor
 final class HotkeyMonitor {
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var isPressed = false
 
-    var key: PushToTalkKey = .rightOption
+    var binding: PushToTalkBinding = .default
     var onPress: (() -> Void)?
     var onRelease: (() -> Void)?
 
@@ -66,14 +28,17 @@ final class HotkeyMonitor {
     func start() -> Bool {
         stop()
 
-        let mask = (1 << CGEventType.flagsChanged.rawValue)
+        var mask: CGEventMask = 0
+        for type in binding.requiredEventTypes {
+            mask |= (1 << CGEventMask(type))
+        }
         let refcon = Unmanaged.passUnretained(self).toOpaque()
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
-            eventsOfInterest: CGEventMask(mask),
+            eventsOfInterest: mask,
             callback: { _, type, event, refcon in
                 guard let refcon else { return Unmanaged.passUnretained(event) }
                 let monitor = Unmanaged<HotkeyMonitor>.fromOpaque(refcon).takeUnretainedValue()
@@ -81,10 +46,14 @@ final class HotkeyMonitor {
                 // CGEvent isn't Sendable, so pull out the plain values before crossing into
                 // actor-isolated code. The tap was added to the main run loop, so this
                 // callback genuinely does run on the main thread.
-                let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-                let flags = event.flags
+                let observed = ObservedEvent(
+                    keyCode: event.getIntegerValueField(.keyboardEventKeycode),
+                    flags: event.flags.rawValue,
+                    button: Int(event.getIntegerValueField(.mouseEventButtonNumber)),
+                    isAutorepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+                )
                 let consume = MainActor.assumeIsolated {
-                    monitor.handle(type: type, keyCode: keyCode, flags: flags)
+                    monitor.handle(type: type, event: observed)
                 }
                 return consume ? nil : Unmanaged.passUnretained(event)
             },
@@ -100,7 +69,7 @@ final class HotkeyMonitor {
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
 
-        Log.hotkey.info("listening for \(self.key.displayName)")
+        Log.hotkey.info("listening for \(self.binding.displayName, privacy: .public)")
         return true
     }
 
@@ -113,27 +82,76 @@ final class HotkeyMonitor {
         }
         tap = nil
         runLoopSource = nil
+        // A binding change while the key is held would otherwise leave this stuck true and
+        // swallow the next press.
         isPressed = false
+    }
+
+    /// Rebinds and rebuilds the tap, since the event mask depends on the binding.
+    @discardableResult
+    func reload(binding: PushToTalkBinding) -> Bool {
+        self.binding = binding
+        return start()
     }
 
     // MARK: - Tap callback
 
+    /// The fields we need, copied out of the non-Sendable `CGEvent`.
+    private struct ObservedEvent {
+        let keyCode: Int64
+        let flags: UInt64
+        let button: Int
+        let isAutorepeat: Bool
+    }
+
     /// - Returns: `true` if the event should be swallowed rather than passed along.
-    private func handle(type: CGEventType, keyCode: Int64, flags: CGEventFlags) -> Bool {
+    private func handle(type: CGEventType, event: ObservedEvent) -> Bool {
         // The system disables a tap that runs too slowly or is interrupted; re-arm it.
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return false
         }
 
-        guard type == .flagsChanged, keyCode == key.keyCode else { return false }
+        switch binding {
+        case .modifier(let modifier):
+            guard type == .flagsChanged, event.keyCode == modifier.keyCode else { return false }
+            return transition(to: event.flags & modifier.deviceFlag != 0)
 
-        let nowPressed = flags.contains(key.flag)
-        guard nowPressed != isPressed else { return false }
-        isPressed = nowPressed
+        case .key(let code):
+            guard event.keyCode == code else { return false }
+            switch type {
+            case .keyDown:
+                // Holding a key produces a stream of repeats. Without this the press fires
+                // over and over — but the repeat still has to be swallowed, or the character
+                // lands in the document anyway.
+                if event.isAutorepeat { return binding.consumesEvent }
+                return transition(to: true)
+            case .keyUp:
+                return transition(to: false)
+            default:
+                return false
+            }
 
-        if nowPressed { onPress?() } else { onRelease?() }
+        case .mouse(let button):
+            guard event.button == button else { return false }
+            switch type {
+            case .otherMouseDown: return transition(to: true)
+            case .otherMouseUp: return transition(to: false)
+            default: return false
+            }
+        }
+    }
 
-        return key.shouldConsumeEvent
+    /// Fires press/release on an actual edge, and reports whether to swallow the event.
+    ///
+    /// The swallow decision is returned for *both* edges deliberately. Consuming the press
+    /// while letting the release through leaves the target app believing the key is still
+    /// held down — the failure the Windows port documents, and the reason this returns the
+    /// same answer either way rather than only suppressing the press.
+    private func transition(to pressed: Bool) -> Bool {
+        guard pressed != isPressed else { return binding.consumesEvent }
+        isPressed = pressed
+        if pressed { onPress?() } else { onRelease?() }
+        return binding.consumesEvent
     }
 }
