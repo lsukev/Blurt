@@ -25,3 +25,9 @@ models/
 
 # Superpowers brainstorming sessions (visual companion mockups, local only)
 .superpowers/
+
+# Generated design canvas (2.4MB; re-seeded from design/*.dc.html)
+design/blurt-onboarding.html
+
+# Packaged builds for hand-off
+dist/

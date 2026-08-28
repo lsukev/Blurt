@@ -58,10 +58,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hud = HUDPanel(controller: controller)
 
         if !controller.activate() {
-            Permissions.promptForAccessibility()
-            // The tap can only be created once the user grants Accessibility, and there's
-            // no notification for that — poll until it takes.
-            retryActivation()
+            // Only ask outright for someone who has already been through setup and lost the
+            // grant since. On a first run the wizard owns this: throwing the system dialog
+            // at a user who hasn't seen the welcome screen yet is the exact experience
+            // onboarding exists to replace.
+            if Settings.shared.hasCompletedSetup {
+                Permissions.promptForAccessibility()
+            }
+            // The tap can only be created once Accessibility lands, and there's no
+            // notification for it — PermissionMonitor polls, we watch it.
+            armHotkeyWhenPermitted()
         }
 
         // Write the dashboard up front so the menu item always opens something, even
@@ -141,13 +147,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func retryActivation() {
-        Task { @MainActor in
-            while !Permissions.hasAccessibility {
-                try? await Task.sleep(for: .seconds(1))
+    /// Arms the event tap the moment Accessibility lands.
+    ///
+    /// Watches `PermissionMonitor` rather than running its own `while !hasAccessibility`
+    /// loop, so there is exactly one poller in the process and the UI sees the same state
+    /// this does. `withObservationTracking` is one-shot, hence the re-arm.
+    private func armHotkeyWhenPermitted() {
+        let monitor = PermissionMonitor.shared
+        withObservationTracking {
+            _ = monitor.accessibility
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                if monitor.accessibility {
+                    self.controller.activate()
+                    Log.app.info("Accessibility granted — hotkey armed")
+                } else {
+                    self.armHotkeyWhenPermitted()
+                }
             }
-            controller.activate()
-            Log.app.info("Accessibility granted — hotkey armed")
         }
     }
 }
@@ -158,6 +176,7 @@ private struct MenuContent: View {
     @Environment(\.openWindow) private var openWindow
     @State private var isPreloadingParakeet = false
     @State private var parakeetOnDisk = ParakeetModels.isDownloaded
+    @State private var permissions = PermissionMonitor.shared
 
     private var parakeetStatus: String {
         if isPreloadingParakeet { return "Loading Parakeet models…" }
@@ -234,11 +253,19 @@ private struct MenuContent: View {
                 .disabled(isPreloadingParakeet || parakeetOnDisk)
         }
 
-        if !Permissions.hasAccessibility {
-            Button("Grant Accessibility…") { Permissions.openAccessibilitySettings() }
+        if !permissions.accessibility {
+            Button("Grant Accessibility…") {
+                Permissions.promptForAccessibility()
+                Permissions.openAccessibilitySettings()
+            }
         }
-        if !Permissions.hasMicrophone {
+        if !permissions.microphone {
             Button("Grant Microphone…") { Permissions.openMicrophoneSettings() }
+        }
+
+        Button("Run Setup Again…") {
+            OnboardingModel.restart()
+            NSApp.activate(ignoringOtherApps: true)
         }
 
         Button("Quit Blurt") { NSApp.terminate(nil) }

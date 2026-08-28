@@ -63,6 +63,14 @@ enum DS {
         /// The lamp when unlit — a dark lens, not an absence.
         static let recordIdle = face(light: 0x7A4A45, dark: 0x4A2724)
 
+        /// A function lamp: setup progress, permission held, key seen. Warm white.
+        ///
+        /// It cannot be green, which is the colour every other app would reach for here —
+        /// green belongs to level instrumentation, and red means recording. Warm-white
+        /// function lamps are what the hardware actually used, so the constraint lands in
+        /// the right place rather than fighting it.
+        static let statusLamp = swatch(0xF0EADC)
+
         // Selection and focus. Deliberately not red: on real equipment red means one thing,
         // and it needs to stay readable at a glance as "this is recording". Selection is
         // carried by a lit panel plus a warm edge instead of by hue.

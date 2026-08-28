@@ -51,6 +51,16 @@ final class Settings {
         didSet { defaults.set(soundEnabled, forKey: Keys.soundEnabled) }
     }
 
+    /// Whether first-run setup has been seen through to the end.
+    ///
+    /// Deliberately separate from whether the grants are actually held. Conflating the two
+    /// is wrong in both directions: someone who revokes Accessibility three weeks from now
+    /// should get a banner, not a welcome wizard, and someone who quit setup halfway should
+    /// not be dropped into a deck that silently does nothing.
+    var hasCompletedSetup: Bool {
+        didSet { defaults.set(hasCompletedSetup, forKey: Keys.hasCompletedSetup) }
+    }
+
     private let defaults = UserDefaults.standard
 
     private enum Keys {
@@ -60,6 +70,7 @@ final class Settings {
         static let engine = "engine"
         static let smartCleanup = "smartCleanup"
         static let compareMode = "compareMode"
+        static let hasCompletedSetup = "hasCompletedSetup"
     }
 
     private init() {
@@ -71,5 +82,6 @@ final class Settings {
         smartCleanup = defaults.object(forKey: Keys.smartCleanup) as? Bool ?? false
         compareMode = defaults.object(forKey: Keys.compareMode) as? Bool ?? false
         soundEnabled = defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true
+        hasCompletedSetup = defaults.bool(forKey: Keys.hasCompletedSetup)
     }
 }

@@ -11,6 +11,29 @@ import SwiftUI
 struct MainWindow: View {
     @Bindable var controller: DictationController
 
+    @State private var settings = Settings.shared
+    @State private var onboarding = OnboardingModel()
+
+    var body: some View {
+        Group {
+            if settings.hasCompletedSetup {
+                DeckView(controller: controller)
+            } else {
+                OnboardingView(model: onboarding, controller: controller)
+            }
+        }
+        // "Run Setup Again…" clears the flag, and the model has to start over with it —
+        // otherwise the wizard comes back sitting on its own final step.
+        .onChange(of: settings.hasCompletedSetup) { _, completed in
+            if !completed { onboarding = OnboardingModel() }
+        }
+    }
+}
+
+/// The front panel proper — what the window shows once setup is behind you.
+struct DeckView: View {
+    @Bindable var controller: DictationController
+
     @State private var section: Section = .transcriptions
 
     enum Section: String, CaseIterable, Identifiable {
@@ -26,6 +49,8 @@ struct MainWindow: View {
             DS.Color.chassis.ignoresSafeArea()
 
             VStack(spacing: DS.Space.base) {
+                PermissionBanner()
+
                 TransportPanel(controller: controller)
 
                 sectionKeys
@@ -387,5 +412,58 @@ struct EmptyPanel: View {
                 .foregroundStyle(DS.Color.inkOnDeck.opacity(0.4))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Permission banner
+
+/// Shown on the deck when a grant is missing *after* setup is behind you.
+///
+/// Deliberately not a re-run of the wizard. Someone who revokes Accessibility three weeks
+/// from now knows what this app is; what they need is the one switch, not a welcome screen.
+/// It stays invisible whenever both grants are held, which is almost always.
+struct PermissionBanner: View {
+    @State private var permissions = PermissionMonitor.shared
+
+    var body: some View {
+        if !permissions.allGranted {
+            Well {
+                HStack(spacing: DS.Space.roomy) {
+                    Lamp(color: DS.Color.statusLamp, isLit: false)
+
+                    VStack(alignment: .leading, spacing: DS.Space.hair) {
+                        Silkscreen(text: headline, color: DS.Color.inkOnDeck)
+                        Text(detail)
+                            .font(DS.Font.label)
+                            .foregroundStyle(DS.Color.inkOnDeck.opacity(0.8))
+                    }
+
+                    Spacer(minLength: 0)
+
+                    if !permissions.accessibility {
+                        TransportKey(title: "Grant Accessibility") {
+                            Permissions.promptForAccessibility()
+                            Permissions.openAccessibilitySettings()
+                        }
+                    } else {
+                        TransportKey(title: "Grant Microphone") {
+                            Permissions.openMicrophoneSettings()
+                        }
+                    }
+                }
+                .padding(DS.Space.base)
+            }
+            .transition(.opacity)
+        }
+    }
+
+    private var headline: String {
+        permissions.accessibility ? "Microphone is off" : "Accessibility is off"
+    }
+
+    private var detail: String {
+        permissions.accessibility
+            ? "Blurt can see your key but can't hear you."
+            : "Blurt can't see your key, so nothing will start."
     }
 }
