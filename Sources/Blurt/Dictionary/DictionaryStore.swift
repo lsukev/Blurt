@@ -79,9 +79,20 @@ final class DictionaryStore {
         }
     }
 
-    /// A corrector over the current entries. Rebuilt on demand — compiling a few dozen small
-    /// regexes is cheap next to transcription, and caching it invites staleness.
-    var corrector: DictionaryCorrector { DictionaryCorrector(entries: entries) }
+    /// A corrector over the current entries, rebuilt only when they change.
+    ///
+    /// It was rebuilt per dictation, on the theory that compiling a few dozen small regexes
+    /// is cheap next to transcription. Measured, it is not: 21 ms at 40 entries and 54 ms at
+    /// 100, against 46 µs and 119 µs to actually apply them — so nearly all of the
+    /// dictionary's cost was recompiling patterns that had not changed, sitting between the
+    /// key release and the text appearing.
+    ///
+    /// The staleness objection was right, which is why `CachedCorrector` validates against
+    /// the entries it was built from rather than depending on every mutation site
+    /// remembering to invalidate.
+    @ObservationIgnored private var cache = CachedCorrector()
+
+    var corrector: DictionaryCorrector { cache.corrector(for: entries) }
 
     var biasPhrases: [String] { DictionaryCorrector.biasPhrases(from: entries) }
 

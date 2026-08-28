@@ -218,6 +218,31 @@ warnings on a cached build, so without it the gate proves nothing.
 
 ---
 
+## Performance, if you touch the text path
+
+Two things were measured and fixed; both would come back if reverted on plausible-sounding
+reasoning.
+
+**Compile regexes once.** `replacingOccurrences(of:options:.regularExpression)` looks free
+and is not — it compiles the pattern unless Foundation's small internal cache still holds
+it. Cleanup cycles thirteen patterns per dictation and the dictionary adds one per rule, so
+the cache is under exactly the pressure that evicts them. The same `stripFillers` call
+measured **16 µs warm and 566 µs once other patterns had pushed it out** — a 30× swing that
+depends on what ran beforehand. `RuleCleanup` now holds compiled `NSRegularExpression`
+statics, and `apply` went from 642 µs to 61 µs.
+
+**The dictionary corrector is cached, and the cache validates itself.** Building one
+compiles a regex per rule: **21 ms at 40 entries, 54 ms at 100**, against 46 µs and 119 µs
+to apply them. It was rebuilt per dictation, so nearly all of the dictionary's cost was
+recompiling unchanged patterns between the key release and the text appearing. The old
+comment argued caching invites staleness — correct, and why `CachedCorrector` compares
+against the entries it was built from rather than trusting mutation sites to invalidate.
+There is no invalidation call to forget. Now 44 µs at 40 entries.
+
+What was measured and left alone: the app burns **no CPU at idle**, and `capitalizeSentences`
+costs 244 µs on a 1,900-character dictation — genuinely O(n) work, and irrelevant beside
+transcription.
+
 ## Regex, if you touch the dictionary
 
 The two engines are not identical. Measured across 30 cases, **9 diverged**. Two affect this

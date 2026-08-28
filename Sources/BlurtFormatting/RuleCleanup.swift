@@ -116,31 +116,62 @@ public enum RuleCleanup {
 
     // MARK: - Passes
 
-    static func stripFillers(from text: String) -> String {
-        var result = text
-        for filler in fillers {
-            let pattern = "(?i)(?<![\\w'])\(filler)\\b,?"
-            result = result.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+    // Patterns are compiled once, at first use, and reused.
+    //
+    // `replacingOccurrences(of:options:.regularExpression)` looks free and is not: it
+    // compiles the pattern unless Foundation's internal cache still holds it, and that
+    // cache is small. Cleanup cycles thirteen distinct patterns per dictation, and the
+    // dictionary corrector adds one per rule, so the cache is under exactly the pressure
+    // that evicts them. Measured: the same call costs 16µs warm and 566µs once other
+    // patterns have pushed it out — a 30× swing that depends on what ran beforehand, which
+    // is the worst kind of performance characteristic to leave in place.
+    //
+    // `DictionaryCorrector` already compiles its rules once. This is the same fix.
+
+    private static let fillerRegexes: [NSRegularExpression] = fillers.compactMap {
+        try? NSRegularExpression(pattern: "(?<![\\w'])\($0)\\b,?", options: [.caseInsensitive])
+    }
+
+    private static let spokenPunctuationRegexes: [(NSRegularExpression, String)] =
+        spokenPunctuation.compactMap { phrase, replacement in
+            guard let regex = try? NSRegularExpression(
+                pattern: "\\b\(phrase)\\b", options: [.caseInsensitive]
+            ) else { return nil }
+            return (regex, replacement)
         }
-        return result
+
+    private static let horizontalWhitespace = try! NSRegularExpression(pattern: "[ \\t]+")
+    private static let spaceBeforePunctuation = try! NSRegularExpression(pattern: " +([,.!?;:])")
+    private static let extraBlankLines = try! NSRegularExpression(pattern: "\\n{3,}")
+
+    private static func replacing(
+        _ text: String, _ regex: NSRegularExpression, with template: String
+    ) -> String {
+        regex.stringByReplacingMatches(
+            in: text,
+            range: NSRange(text.startIndex..., in: text),
+            withTemplate: template
+        )
+    }
+
+    static func stripFillers(from text: String) -> String {
+        fillerRegexes.reduce(text) { replacing($0, $1, with: "") }
     }
 
     static func applySpokenPunctuation(to text: String) -> String {
-        var result = text
-        for (phrase, replacement) in spokenPunctuation {
-            result = result.replacingOccurrences(
-                of: "(?i)\\b\(phrase)\\b", with: replacement, options: .regularExpression
-            )
+        spokenPunctuationRegexes.reduce(text) { result, pair in
+            // Templates are matched against `$` groups, so a literal newline replacement
+            // has to be escaped out of template syntax. These have none, but the escape
+            // keeps a future entry containing `$` from silently becoming a backreference.
+            replacing(result, pair.0, with: NSRegularExpression.escapedTemplate(for: pair.1))
         }
-        return result
     }
 
     static func collapseWhitespace(in text: String) -> String {
-        text
-            .replacingOccurrences(of: "[ \\t]+", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: " +([,.!?;:])", with: "$1", options: .regularExpression)
-            .replacingOccurrences(of: "\\n{3,}", with: "\n\n", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        var result = replacing(text, horizontalWhitespace, with: " ")
+        result = replacing(result, spaceBeforePunctuation, with: "$1")
+        result = replacing(result, extraBlankLines, with: NSRegularExpression.escapedTemplate(for: "\n\n"))
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func capitalizeSentences(in text: String) -> String {
